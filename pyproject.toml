@@ -17,6 +17,8 @@ dependencies = [
     "hydra-core>=1.3.0",
     "omegaconf>=2.3.0",
     "tensorboard>=2.20.0",
+    "onnx>=1.15.0",          # Pour l'export ONNX
+    "onnxruntime>=1.16.0",   # Pour l'inférence ONNX (optionnel)
 ]
 [[tool.uv.index]]
 name = "pytorch-cu128"
