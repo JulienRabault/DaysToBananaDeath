@@ -1,0 +1,13 @@
+# @package callbacks.f1_logger
+_target_: src.callbacks.F1LoggerCallback
+
+# Logging behavior
+log_on_step: false
+log_on_epoch: true
+prog_bar: true
+
+# Per-class metrics
+log_per_class: false  # Set to true for detailed per-class F1
+
+# Model configuration
+num_classes: 4

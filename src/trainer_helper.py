@@ -142,6 +142,18 @@ class ComponentFactory:
     def create_trainer(cfg: DictConfig, logger: Logger, callbacks: List[Callback]) -> L.Trainer:
         """Create trainer from configuration."""
         trainer_cfg = cfg.trainer.copy()
+
+        # Synchroniser automatiquement default_root_dir avec le working dir d'Hydra
+        from hydra.core.hydra_config import HydraConfig
+        try:
+            hydra_cfg = HydraConfig.get()
+            hydra_output_dir = hydra_cfg.runtime.output_dir
+            trainer_cfg.default_root_dir = hydra_output_dir
+            print(f"🔗 Trainer output dir synchronized with Hydra: {hydra_output_dir}")
+        except Exception:
+            # Fallback si Hydra n'est pas disponible
+            pass
+
         return instantiate(trainer_cfg, logger=logger, callbacks=callbacks)
 
 
@@ -201,7 +213,13 @@ class ModelArtifactManager:
         """Save model in ONNX format."""
         try:
             onnx_path = artifacts_dir / "model.onnx"
-            dummy_input = torch.randn(1, 3, 224, 224)
+
+            device = next(model.parameters()).device
+            dummy_input = torch.randn(1, 3, 224, 224, device=device)
+
+            # Set model to eval mode for export
+            model.eval()
+
             torch.onnx.export(
                 model,
                 dummy_input,

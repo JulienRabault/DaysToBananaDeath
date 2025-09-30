@@ -1,0 +1,13 @@
+# @package callbacks.recall_logger
+_target_: src.callbacks.RecallLoggerCallback
+
+# Logging behavior
+log_on_step: false
+log_on_epoch: true
+prog_bar: true
+
+# Per-class metrics
+log_per_class: false  # Set to true for detailed per-class recall
+
+# Model configuration
+num_classes: 4

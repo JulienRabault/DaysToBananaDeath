@@ -28,4 +28,3 @@ benchmark: true
 
 # Other settings
 enable_checkpointing: true
-default_root_dir: "outputs"
