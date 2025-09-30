@@ -212,8 +212,17 @@ class ModelArtifactManager:
     def _save_onnx_model(self, model: L.LightningModule, artifacts_dir: Path) -> None:
         """Save model in ONNX format."""
         try:
+            import onnx
+        except ImportError:
+            print("⚠️ ONNX export skipped: 'onnx' package not installed.")
+            print("   To enable ONNX export, install with: pip install onnx onnxruntime")
+            print("   Or update dependencies with: uv sync")
+            return
+
+        try:
             onnx_path = artifacts_dir / "model.onnx"
 
+            # Create dummy input on the same device as the model
             device = next(model.parameters()).device
             dummy_input = torch.randn(1, 3, 224, 224, device=device)
 
@@ -231,9 +240,10 @@ class ModelArtifactManager:
                 output_names=['output'],
                 dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
             )
-            print(f"ONNX model saved to {onnx_path}")
+            print(f"✅ ONNX model saved to {onnx_path}")
         except Exception as e:
-            print(f"Failed to export ONNX model: {e}")
+            print(f"❌ Failed to export ONNX model: {e}")
+            print("   This is optional - training artifacts will still be saved.")
 
     def _create_wandb_artifact(self, artifacts_dir: Path, trainer: L.Trainer, checkpoint_path: str) -> None:
         """Create and log W&B artifact."""
