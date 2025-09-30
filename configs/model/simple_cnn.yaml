@@ -1,0 +1,16 @@
+# @package model
+_target_: src.model.SimpleConvNet
+
+# Model architecture
+model_name: "simple_cnn"
+input_channels: 3
+dropout_rate: 0.5
+
+# Training parameters
+num_classes: 4
+learning_rate: 2e-3
+weight_decay: 1e-4
+scheduler: "cosine"
+
+# Logging
+log_wandb: true

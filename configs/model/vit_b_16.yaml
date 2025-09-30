@@ -1,0 +1,17 @@
+# @package model
+_target_: src.model.VisionTransformerClassifier
+
+# Model architecture
+model_name: "vit_b_16"
+pretrained: true
+freeze_backbone: false
+dropout_rate: 0.1
+
+# Training parameters
+num_classes: 4
+learning_rate: 5e-4
+weight_decay: 1e-4
+scheduler: "cosine"
+
+# Logging
+log_wandb: true

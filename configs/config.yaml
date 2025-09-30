@@ -1,0 +1,25 @@
+# Base configuration for banana ripeness classification
+defaults:
+  - model: resnet50
+  - data: default
+  - trainer: default
+  - logger: wandb
+  - callbacks: default
+  - experiment: null
+  - _self_
+
+# Random seed for reproducibility
+seed: 42
+
+# Experiment metadata
+experiment:
+  name: banana_ripeness_classification
+  version: 0.1
+
+# Hydra configuration
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${hydra:job.num}

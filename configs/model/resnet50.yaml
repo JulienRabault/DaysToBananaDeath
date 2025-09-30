@@ -1,0 +1,17 @@
+# @package model
+_target_: src.model.ResNetClassifier
+
+# Model architecture
+model_name: "resnet50"
+pretrained: true
+freeze_backbone: false
+dropout_rate: 0.5
+
+# Training parameters
+num_classes: 4
+learning_rate: 1e-3
+weight_decay: 1e-4
+scheduler: "cosine"  # cosine, step, plateau, none
+
+# Logging
+log_wandb: true

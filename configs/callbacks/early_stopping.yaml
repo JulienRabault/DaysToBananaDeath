@@ -1,0 +1,17 @@
+# @package callbacks.early_stopping
+_target_: lightning.pytorch.callbacks.EarlyStopping
+
+# Monitoring
+monitor: "val/loss"
+mode: "min"
+patience: 15
+min_delta: 0.001
+
+# Behavior
+strict: true
+check_finite: true
+stopping_threshold: null
+divergence_threshold: null
+
+# Logging
+verbose: true

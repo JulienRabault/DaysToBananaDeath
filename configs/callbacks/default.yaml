@@ -1,0 +1,7 @@
+# @package callbacks
+defaults:
+  - model_checkpoint
+  - early_stopping
+  - lr_monitor
+  - metrics_logger  # Nouveau callback pour ACC, F1, Recall
+  - _self_

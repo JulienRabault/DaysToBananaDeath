@@ -1,0 +1,17 @@
+# @package data
+_target_: src.dataset.create_banana_datamodule
+
+# Data paths
+data_dir: "../data"
+
+# Data loading
+batch_size: 32
+num_workers: 4
+pin_memory: true
+
+# Image preprocessing
+img_size: [224, 224]
+use_augmentation: false
+
+# Class balancing
+use_class_weights: true

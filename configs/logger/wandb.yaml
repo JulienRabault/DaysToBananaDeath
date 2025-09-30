@@ -1,0 +1,24 @@
+# @package logger
+_target_: lightning.pytorch.loggers.WandbLogger
+
+# Project settings
+project: "banana-classification"
+name: null  # Will be auto-generated
+save_dir: "logs"
+
+# W&B specific settings
+log_model: "all"  # Log model checkpoints
+offline: false
+id: null
+anonymous: null
+version: null
+tags: null  # Will be set from experiment config
+
+# Logging behavior
+prefix: ""
+job_type: "train"
+group: null
+notes: null  # Will be set from experiment config
+
+# Settings
+save_code: true

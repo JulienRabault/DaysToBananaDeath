@@ -1,0 +1,46 @@
+# @package _global_
+# Debug profile: quick, CPU-only, minimal logging
+
+defaults:
+  - override /model: simple_cnn
+  - override /data: default
+  - override /trainer: default
+  - override /logger: tensorboard
+  - override /callbacks: default
+
+# Reproducibility
+seed: 123
+
+# Data tweaks for debug
+data:
+  batch_size: 4
+  num_workers: 0        # avoid multiprocessing issues on Windows
+  use_augmentation: false
+  use_class_weights: false
+
+# Model tweaks for debug
+model:
+  # SimpleConvNet ignores pretrained, but keep wandb logging off explicitly
+  log_wandb: false
+
+# Trainer tweaks for debug
+trainer:
+  max_epochs: 1
+  accelerator: cpu
+  devices: 1
+  precision: 32
+  num_sanity_val_steps: 1
+  fast_dev_run: true     # run a single batch for train/val/test
+  enable_progress_bar: true
+
+# Logger tweaks for debug
+logger:
+  save_dir: logs
+  name: debug
+  version: null
+
+# Optionally relax callbacks for speed (mostly ignored with fast_dev_run)
+callbacks:
+  early_stopping:
+    patience: 1
+

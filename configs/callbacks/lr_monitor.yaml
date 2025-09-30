@@ -1,0 +1,7 @@
+# @package callbacks.lr_monitor
+_target_: lightning.pytorch.callbacks.LearningRateMonitor
+
+# Logging settings
+logging_interval: "epoch"
+log_momentum: true
+log_weight_decay: false

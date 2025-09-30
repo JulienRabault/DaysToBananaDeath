@@ -1,0 +1,17 @@
+# @package callbacks.metrics_logger
+_target_: src.callbacks.MetricsLoggerCallback
+
+# Metrics to log
+log_accuracy: true
+log_f1: true
+log_recall: true
+log_precision: true
+log_confusion_matrix: false  # Already handled in model
+
+# Logging behavior
+log_on_step: false
+log_on_epoch: true
+prog_bar: true
+
+# Per-class metrics
+log_per_class: false  # Set to true for detailed per-class metrics

@@ -1,0 +1,15 @@
+# @package logger
+_target_: lightning.pytorch.loggers.TensorBoardLogger
+
+# Directory settings
+save_dir: "logs"
+name: "banana_classification"
+version: null  # Auto-generated
+
+# Logging settings
+log_graph: false
+default_hp_metric: true
+prefix: ""
+
+# TensorBoard specific
+sub_dir: null
