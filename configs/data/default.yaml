@@ -2,7 +2,7 @@
 _target_: src.dataset.create_banana_datamodule
 
 # Data paths
-data_dir: "../data"
+data_dir: "/mnt/data/WORK/DATA/"
 
 # Data loading
 batch_size: 32

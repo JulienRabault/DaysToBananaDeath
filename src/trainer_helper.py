@@ -8,12 +8,12 @@ import torch
 import wandb
 import lightning as L
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import List, Optional, Tuple
 from omegaconf import DictConfig
 from lightning.pytorch.loggers import Logger
 from lightning.pytorch.callbacks import Callback
-import hydra
 from hydra.utils import instantiate
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 
 class ConfigValidator:
@@ -121,7 +121,7 @@ class ComponentFactory:
     @staticmethod
     def create_callbacks(cfg: DictConfig, experiment_manager: ExperimentManager) -> List[Callback]:
         """Create callbacks from configuration."""
-        callbacks = []
+        callbacks: List[Callback] = []
 
         if 'callbacks' in cfg:
             for callback_name, callback_cfg in cfg.callbacks.items():
@@ -194,10 +194,18 @@ class ModelArtifactManager:
                 'WandbLogger' in self.cfg.logger._target_)
 
     def _get_best_checkpoint(self, trainer: L.Trainer) -> Optional[str]:
-        """Get path to best checkpoint."""
-        if hasattr(trainer, 'checkpoint_callback') and trainer.checkpoint_callback:
-            return trainer.checkpoint_callback.best_model_path
-        return None
+        """Get path to best checkpoint (robust across Lightning versions)."""
+        # Prefer scanning callbacks for ModelCheckpoint
+        best_path: Optional[str] = None
+        for cb in getattr(trainer, 'callbacks', []) or []:
+            if isinstance(cb, ModelCheckpoint):
+                if getattr(cb, 'best_model_path', None):
+                    best_path = cb.best_model_path
+                    break
+        # Fallback to trainer.checkpoint_callback if available
+        if not best_path and hasattr(trainer, 'checkpoint_callback') and trainer.checkpoint_callback:
+            best_path = getattr(trainer.checkpoint_callback, 'best_model_path', None)
+        return best_path
 
     def _save_state_dict(self, model: L.LightningModule, artifacts_dir: Path) -> None:
         """Save model state dict."""
@@ -231,7 +239,7 @@ class ModelArtifactManager:
 
             torch.onnx.export(
                 model,
-                dummy_input,
+                (dummy_input,),  # inputs as tuple
                 onnx_path,
                 export_params=True,
                 opset_version=11,
@@ -257,7 +265,7 @@ class ModelArtifactManager:
                 "framework": "pytorch-lightning",
                 "architecture": self.cfg.model.model_name,
                 "num_classes": self.cfg.model.num_classes,
-                "best_val_acc": float(trainer.callback_metrics.get("val/acc", 0)),
+                "best_val_acc": float(trainer.callback_metrics.get("val/accuracy", 0)),
                 "best_val_f1": float(trainer.callback_metrics.get("val/f1", 0)),
                 "epochs_trained": trainer.current_epoch,
                 "config": dict(self.cfg),
@@ -328,7 +336,7 @@ class TrainingOrchestrator:
         """Setup data module."""
         print("📊 Setting up data module...")
         datamodule = self.component_factory.create_datamodule(self.cfg)
-        datamodule.setup()
+        datamodule.setup(stage=None)
 
         # Print dataset info
         if hasattr(datamodule, 'print_dataset_info'):

@@ -3,8 +3,4 @@ defaults:
   - model_checkpoint
   - early_stopping
   - lr_monitor
-  - accuracy_logger    # Callback dédié pour accuracy
-  - f1_logger         # Callback dédié pour F1-score
-  - recall_logger     # Callback dédié pour recall
-  - precision_logger  # Callback dédié pour precision
   - _self_

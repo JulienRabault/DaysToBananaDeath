@@ -3,6 +3,7 @@
 Inference script for banana ripeness classification.
 Loads a trained model from checkpoints or W&B and performs predictions.
 Designed for web deployment and FastAPI integration.
+Supports only ResNet50 and ViT-B/16.
 """
 
 import torch
@@ -19,8 +20,8 @@ import tempfile
 import os
 from omegaconf import OmegaConf, DictConfig
 
-# Import our models
-from model import ResNetClassifier, SimpleConvNet, EfficientNetClassifier, VisionTransformerClassifier, MobileNetClassifier
+# Import supported models only
+from model import ResNetClassifier, VisionTransformerClassifier
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +47,7 @@ class BananaClassifierInference:
             wandb_run_path: W&B run path (e.g., "username/project/run_id")
             wandb_artifact_name: W&B artifact name for model
             config_path: Path to config file (YAML)
-            model_type: Type of model (resnet50, simple_cnn, etc.)
+            model_type: Type of model ("resnet50" or "vit_b_16")
             device: Device to run inference on ("cpu", "cuda", "auto")
             img_size: Image size for preprocessing (height, width)
         """
@@ -109,26 +110,14 @@ class BananaClassifierInference:
 
         logger.info(f"Loading model from checkpoint: {checkpoint_path}")
 
-        # Map model type to class
+        # Map model type to class (restricted)
         model_classes = {
-            "resnet18": ResNetClassifier,
             "resnet50": ResNetClassifier,
-            "resnet34": ResNetClassifier,
-            "resnet101": ResNetClassifier,
-            "simple_cnn": SimpleConvNet,
-            "efficientnet_b0": EfficientNetClassifier,
-            "efficientnet_b1": EfficientNetClassifier,
-            "efficientnet_b2": EfficientNetClassifier,
-            "efficientnet_b3": EfficientNetClassifier,
             "vit_b_16": VisionTransformerClassifier,
-            "vit_b_32": VisionTransformerClassifier,
-            "vit_l_16": VisionTransformerClassifier,
-            "mobilenet_v3_small": MobileNetClassifier,
-            "mobilenet_v3_large": MobileNetClassifier
         }
 
         if self.model_type not in model_classes:
-            raise ValueError(f"Unsupported model type: {self.model_type}")
+            raise ValueError(f"Unsupported model type: {self.model_type}. Only 'resnet50' and 'vit_b_16' are supported.")
 
         model_class = model_classes[self.model_type]
 
@@ -227,8 +216,8 @@ class BananaClassifierInference:
     def _setup_transform(self) -> A.Compose:
         """Setup image preprocessing transforms."""
         # Use same normalization as training (ImageNet stats)
-        mean = [0.485, 0.456, 0.406]
-        std = [0.229, 0.224, 0.225]
+        mean = (0.485, 0.456, 0.406)
+        std = (0.229, 0.224, 0.225)
 
         return A.Compose([
             A.Resize(height=self.img_size[0], width=self.img_size[1]),
@@ -519,7 +508,7 @@ def main():
     parser.add_argument("--directory", help="Path to directory of images")
     parser.add_argument("--recursive", action="store_true", help="Search subdirectories")
     parser.add_argument("--output", help="Output JSON file for results")
-    parser.add_argument("--model_type", default="resnet50", help="Model type")
+    parser.add_argument("--model_type", default="resnet50", help="Model type ('resnet50' or 'vit_b_16')")
     parser.add_argument("--device", default="auto", help="Device (cpu/cuda/auto)")
 
     args = parser.parse_args()

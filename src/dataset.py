@@ -1,7 +1,6 @@
 import os
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
 from PIL import Image
 import lightning as L
 from typing import Optional, Dict, Tuple, List
@@ -270,33 +269,3 @@ def create_banana_datamodule(
         pin_memory=pin_memory
 
     )
-
-
-if __name__ == "__main__":
-    # Usage example
-    import numpy as np
-
-    # Create DataModule
-    dm = create_banana_datamodule(
-        data_dir="data",
-        batch_size=16,
-        num_workers=2,
-        img_size=(224, 224)
-    )
-
-    # Prepare data
-    dm.setup()
-
-    # Display information
-    dm.print_dataset_info()
-
-    # Test loading a batch
-    train_loader = dm.train_dataloader()
-    batch = next(iter(train_loader))
-    images, labels = batch
-
-    print(f"\nDataLoader Test:")
-    print(f"Images shape: {images.shape}")
-    print(f"Labels shape: {labels.shape}")
-    print(f"Labels in this batch: {labels.tolist()}")
-    print(f"Corresponding classes: {[dm.classes[label] for label in labels]}")
