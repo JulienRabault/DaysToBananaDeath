@@ -1,7 +1,7 @@
 # @package data
-_target_: src.dataset.create_banana_datamodule
+_target_: src.dataset.BananaDataModule
 
-# Data paths
+# Dataset configuration
 data_dir: "/mnt/data/WORK/DATA/"
 
 # Data loading
@@ -9,9 +9,19 @@ batch_size: 32
 num_workers: 4
 pin_memory: true
 
+# Data splits
+train_split: 0.7
+val_split: 0.15
+test_split: 0.15
+
 # Image preprocessing
 img_size: [224, 224]
-use_augmentation: false
+normalize: true
+
+augment_train: False
 
 # Class balancing
 use_class_weights: true
+
+# Caching
+cache_dataset: false

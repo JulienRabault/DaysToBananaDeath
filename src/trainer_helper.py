@@ -4,16 +4,19 @@ Implements SOLID principles for clean and maintainable training pipeline.
 """
 
 import os
+import sys
 import torch
 import wandb
 import lightning as L
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from omegaconf import DictConfig
 from lightning.pytorch.loggers import Logger
 from lightning.pytorch.callbacks import Callback
 from hydra.utils import instantiate
 from lightning.pytorch.callbacks import ModelCheckpoint
+from datetime import datetime
+from uniqpath import unique_path
 
 
 class ConfigValidator:
@@ -42,35 +45,141 @@ class ConfigValidator:
 
 
 class ExperimentManager:
-    """Manages experiment metadata and versioning."""
+    """Manages experiment metadata and versioning following ML best practices."""
 
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
         self.experiment_name = self._generate_experiment_name()
+        self.run_name = self._generate_run_name()
+        self.version = self._generate_version()
         self.output_dir = self._setup_output_directory()
 
     def _generate_experiment_name(self) -> str:
-        """Generate unique experiment name."""
-        if self.cfg.experiment.name and self.cfg.experiment.version:
-            return f"{self.cfg.experiment.name}_v{self.cfg.experiment.version}"
+        """Generate experiment name following ML naming conventions."""
+        # Use explicit experiment name if provided
+        if hasattr(self.cfg, 'experiment') and self.cfg.experiment.get('name'):
+            return self.cfg.experiment.name
 
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Default: dataset-model pattern (ML standard)
         model_name = self.cfg.model.get('model_name', 'unknown')
-        return f"{model_name}_{timestamp}"
+        dataset_name = self.cfg.data.get('dataset_name', 'banana-ripeness')
+        return f"{dataset_name}-{model_name}"
+
+    def _generate_run_name(self) -> str:
+        """Generate descriptive run name with key hyperparameters using uniqpath for uniqueness."""
+        components = []
+
+        # Model architecture
+        model_name = self.cfg.model.get('model_name', 'unknown')
+        components.append(model_name)
+
+        # Key hyperparameters (ML naming convention)
+        lr = self.cfg.model.get('learning_rate', 1e-3)
+        batch_size = self.cfg.data.get('batch_size', 32)
+        epochs = self.cfg.trainer.get('max_epochs', 50)
+
+        # Format: model_lr1e-3_bs32_ep50
+        components.append(f"lr{lr:.0e}")
+        components.append(f"bs{batch_size}")
+        components.append(f"ep{epochs}")
+
+        # Add experiment tag if provided
+        if hasattr(self.cfg, 'experiment') and self.cfg.experiment.get('tag'):
+            components.append(self.cfg.experiment.tag)
+
+        # Base run name without uniqueness suffix
+        base_run_name = "_".join(components)
+
+        # Use uniqpath to ensure uniqueness with timestamp format
+        # This will add _{timestamp} if needed to avoid conflicts
+        return unique_path(
+            base_run_name,
+            suffix_format="_{timestamp}",
+            if_exists_only=False,  # Always add suffix for better organization
+            return_str=True
+        ) if hasattr(unique_path(base_run_name, suffix_format="_{timestamp}", if_exists_only=False, return_str=False), 'name') else str(unique_path(base_run_name, suffix_format="_{timestamp}", if_exists_only=False, return_str=True))
+
+    def _generate_version(self) -> str:
+        """Generate semantic version following ML versioning best practices."""
+        if hasattr(self.cfg, 'experiment') and self.cfg.experiment.get('version'):
+            return self.cfg.experiment.version
+
+        # Auto-generate version based on date (semantic versioning for ML)
+        return datetime.now().strftime("v%Y.%m.%d")
 
     def _setup_output_directory(self) -> Path:
-        """Setup experiment output directory."""
-        output_dir = Path(f"outputs/{self.experiment_name}")
-        output_dir.mkdir(parents=True, exist_ok=True)
+        """Setup hierarchical output directory structure using uniqpath."""
+        # Structure: outputs/experiment_name/version/run_name
+        base_path = Path(f"outputs/{self.experiment_name}/{self.version}/{self.run_name}")
 
-        # Create subdirectories
-        (output_dir / "checkpoints").mkdir(exist_ok=True)
-        (output_dir / "logs").mkdir(exist_ok=True)
-        (output_dir / "artifacts").mkdir(exist_ok=True)
+        # Use uniqpath to ensure the directory path is unique
+        unique_output_dir = unique_path(
+            base_path,
+            suffix_format="_{rand:4}",  # Short random suffix if needed
+            if_exists_only=True,        # Only add suffix if directory exists
+            return_str=False
+        )
 
-        return output_dir
+        unique_output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Create standard MLOps subdirectories
+        (unique_output_dir / "checkpoints").mkdir(exist_ok=True)
+        (unique_output_dir / "logs").mkdir(exist_ok=True)
+        (unique_output_dir / "artifacts").mkdir(exist_ok=True)
+        (unique_output_dir / "metrics").mkdir(exist_ok=True)
+        (unique_output_dir / "plots").mkdir(exist_ok=True)
+
+        return unique_output_dir
+
+    def get_run_tags(self) -> List[str]:
+        """Generate standardized tags for the run."""
+        tags = []
+
+        # Model architecture tag
+        model_name = self.cfg.model.get('model_name', 'unknown')
+        tags.append(f"model:{model_name}")
+
+        # Task type
+        tags.append("task:classification")
+        tags.append("domain:computer-vision")
+
+        # Dataset
+        dataset_name = self.cfg.data.get('dataset_name', 'banana-ripeness')
+        tags.append(f"dataset:{dataset_name}")
+
+        # Training config
+        scheduler = self.cfg.model.get('scheduler', 'cosine')
+        tags.append(f"scheduler:{scheduler}")
+
+        # Custom tags from config
+        if hasattr(self.cfg, 'experiment') and self.cfg.experiment.get('tags'):
+            tags.extend(self.cfg.experiment.tags)
+
+        return tags
+
+    def get_run_metadata(self) -> Dict[str, any]:
+        """Generate comprehensive metadata for the run."""
+        return {
+            "experiment_name": self.experiment_name,
+            "run_name": self.run_name,
+            "version": self.version,
+            "model_architecture": self.cfg.model.get('model_name'),
+            "dataset": self.cfg.data.get('dataset_name', 'banana-ripeness'),
+            "num_classes": self.cfg.model.get('num_classes', 4),
+            "hyperparameters": {
+                "learning_rate": self.cfg.model.get('learning_rate'),
+                "batch_size": self.cfg.data.get('batch_size'),
+                "max_epochs": self.cfg.trainer.get('max_epochs'),
+                "optimizer": "AdamW",
+                "scheduler": self.cfg.model.get('scheduler'),
+                "weight_decay": self.cfg.model.get('weight_decay'),
+            },
+            "framework": "pytorch-lightning",
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
+            "created_at": datetime.now().isoformat(),
+        }
+
+    # Legacy methods for backward compatibility
     def get_checkpoint_dir(self) -> str:
         """Get checkpoint directory path."""
         return str(self.output_dir / "checkpoints")
@@ -100,21 +209,28 @@ class ComponentFactory:
 
     @staticmethod
     def create_logger(cfg: DictConfig, experiment_manager: ExperimentManager) -> Logger:
-        """Create logger from configuration."""
+        """Create logger from configuration with proper ML naming."""
         logger_cfg = cfg.logger.copy()
 
-        # Set experiment metadata
-        if hasattr(logger_cfg, 'name') and logger_cfg.name is None:
-            logger_cfg.name = experiment_manager.experiment_name
+        # Use the run_name (descriptive) for WandB, not experiment_name
+        logger_cfg.name = experiment_manager.run_name
+        logger_cfg.save_dir = experiment_manager.get_logs_dir()
 
-        if hasattr(logger_cfg, 'save_dir'):
-            logger_cfg.save_dir = experiment_manager.get_logs_dir()
+        # Set standardized tags and metadata
+        logger_cfg.tags = experiment_manager.get_run_tags()
 
-        if hasattr(logger_cfg, 'tags') and logger_cfg.tags is None:
-            logger_cfg.tags = cfg.experiment.get('tags', [])
+        # Set experiment group for organization
+        if hasattr(logger_cfg, 'group'):
+            logger_cfg.group = experiment_manager.experiment_name
 
-        if hasattr(logger_cfg, 'notes') and logger_cfg.notes is None:
-            logger_cfg.notes = cfg.experiment.get('notes', '')
+        # Add version info
+        if hasattr(logger_cfg, 'version'):
+            logger_cfg.version = experiment_manager.version
+
+        # Set notes from metadata
+        metadata = experiment_manager.get_run_metadata()
+        if hasattr(logger_cfg, 'notes'):
+            logger_cfg.notes = f"Model: {metadata['model_architecture']}, LR: {metadata['hyperparameters']['learning_rate']}, BS: {metadata['hyperparameters']['batch_size']}"
 
         return instantiate(logger_cfg)
 
@@ -143,22 +259,14 @@ class ComponentFactory:
         """Create trainer from configuration."""
         trainer_cfg = cfg.trainer.copy()
 
-        # Synchroniser automatiquement default_root_dir avec le working dir d'Hydra
-        from hydra.core.hydra_config import HydraConfig
-        try:
-            hydra_cfg = HydraConfig.get()
-            hydra_output_dir = hydra_cfg.runtime.output_dir
-            trainer_cfg.default_root_dir = hydra_output_dir
-            print(f"🔗 Trainer output dir synchronized with Hydra: {hydra_output_dir}")
-        except Exception:
-            # Fallback si Hydra n'est pas disponible
-            pass
+        # No need to sync with Hydra anymore - ExperimentManager handles directory structure
+        # The trainer will use the logger's save_dir which is already set by ExperimentManager
 
         return instantiate(trainer_cfg, logger=logger, callbacks=callbacks)
 
 
 class ModelArtifactManager:
-    """Manages model artifacts and W&B integration."""
+    """Manages model artifacts and W&B integration with ML naming conventions."""
 
     def __init__(self, experiment_manager: ExperimentManager, cfg: DictConfig):
         self.experiment_manager = experiment_manager
@@ -185,7 +293,7 @@ class ModelArtifactManager:
         self._save_full_model(best_model, artifacts_dir)
         self._save_onnx_model(best_model, artifacts_dir)
 
-        # Create W&B artifact
+        # Create W&B artifact with proper naming
         self._create_wandb_artifact(artifacts_dir, trainer, best_checkpoint_path)
 
     def _is_wandb_enabled(self) -> bool:
@@ -254,21 +362,29 @@ class ModelArtifactManager:
             print("   This is optional - training artifacts will still be saved.")
 
     def _create_wandb_artifact(self, artifacts_dir: Path, trainer: L.Trainer, checkpoint_path: str) -> None:
-        """Create and log W&B artifact."""
-        artifact_name = f"{self.cfg.model.model_name}-banana-classifier"
+        """Create and log W&B artifact with proper ML naming."""
+        # Use semantic artifact naming: dataset-model-version
+        metadata = self.experiment_manager.get_run_metadata()
+        artifact_name = f"{metadata['dataset']}-{metadata['model_architecture']}-{self.experiment_manager.version}"
 
         artifact = wandb.Artifact(
             name=artifact_name,
             type="model",
-            description=f"Banana ripeness classifier using {self.cfg.model.model_name}",
+            description=f"Banana ripeness classifier using {metadata['model_architecture']} - {self.experiment_manager.run_name}",
             metadata={
                 "framework": "pytorch-lightning",
-                "architecture": self.cfg.model.model_name,
-                "num_classes": self.cfg.model.num_classes,
-                "best_val_acc": float(trainer.callback_metrics.get("val/accuracy", 0)),
+                "experiment": self.experiment_manager.experiment_name,
+                "run_name": self.experiment_manager.run_name,
+                "version": self.experiment_manager.version,
+                "architecture": metadata['model_architecture'],
+                "dataset": metadata['dataset'],
+                "num_classes": metadata['num_classes'],
+                "best_val_accuracy": float(trainer.callback_metrics.get("val/accuracy", 0)),
                 "best_val_f1": float(trainer.callback_metrics.get("val/f1", 0)),
                 "epochs_trained": trainer.current_epoch,
-                "config": dict(self.cfg),
+                "hyperparameters": metadata['hyperparameters'],
+                "created_at": metadata['created_at'],
+                "tags": self.experiment_manager.get_run_tags(),
             }
         )
 
@@ -283,7 +399,7 @@ class ModelArtifactManager:
 
         # Log artifact
         wandb.log_artifact(artifact)
-        print(f"Model artifacts logged to W&B: {artifact_name}")
+        print(f"✅ Model artifacts logged to W&B: {artifact_name}")
 
 
 class TrainingOrchestrator:
@@ -300,6 +416,8 @@ class TrainingOrchestrator:
     def run_training(self) -> Tuple[L.LightningModule, L.Trainer]:
         """Execute complete training pipeline."""
         print(f"🚀 Starting experiment: {self.experiment_manager.experiment_name}")
+        print(f"📊 Run: {self.experiment_manager.run_name}")
+        print(f"🏷️  Version: {self.experiment_manager.version}")
 
         # Set random seed
         self._set_seed()
@@ -346,7 +464,7 @@ class TrainingOrchestrator:
 
     def _setup_model(self, datamodule: L.LightningDataModule) -> L.LightningModule:
         """Setup model with optional class weights."""
-        print(f"🏗️ Creating {self.cfg.model.model_name} model...")
+        print(f"Creating {self.cfg.model.model_name} model...")
 
         # Get class weights if enabled
         class_weights = None
@@ -383,6 +501,9 @@ class TrainingOrchestrator:
     def _log_experiment_info(self, model: L.LightningModule, datamodule: L.LightningDataModule) -> None:
         """Log experiment information."""
         if hasattr(model.logger, 'experiment') and hasattr(model.logger.experiment, 'config'):
+            # Log comprehensive metadata
+            metadata = self.experiment_manager.get_run_metadata()
+            model.logger.experiment.config.update(metadata)
             model.logger.experiment.config.update(dict(self.cfg))
 
     def _train_model(self, trainer: L.Trainer, model: L.LightningModule, datamodule: L.LightningDataModule) -> None:

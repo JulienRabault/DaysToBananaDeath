@@ -3,8 +3,8 @@ _target_: lightning.pytorch.loggers.WandbLogger
 
 # Project settings
 project: "banana-classification"
-name: null  # Will be auto-generated
-save_dir: "logs"
+name: null  # Will be set by trainer_helper
+save_dir: null  # Will be set by trainer_helper
 
 # W&B specific settings
 log_model: "all"  # Log model checkpoints

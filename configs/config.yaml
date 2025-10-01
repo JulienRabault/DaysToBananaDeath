@@ -11,15 +11,24 @@ defaults:
 # Random seed for reproducibility
 seed: 42
 
-# Experiment metadata
+# Experiment metadata (ML naming conventions)
 experiment:
-  name: banana_ripeness_classification
-  version: 0.1
+  name: "banana-ripeness-classifier"  # Base experiment name
+  version: null  # Will auto-generate: v2025.10.01
+  tag: null      # Optional: "baseline", "improved", etc.
+  notes: "Banana ripeness classification using deep learning"
+  tags:          # Additional tags for organization
+    - "computer-vision"
+    - "food-classification"
+    - "pytorch-lightning"
 
-# Hydra configuration
+# Hydra configuration - aligned with ML naming system
 hydra:
   run:
-    dir: outputs/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ../outputs/hydra/${now:%Y-%m-%d_%H-%M-%S}  # Redirect to project root
   sweep:
-    dir: multirun/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ../outputs/sweeps/${now:%Y-%m-%d_%H-%M-%S}
     subdir: ${hydra:job.num}
+  job:
+    chdir: false  # Don't change working directory
+  output_subdir: .hydra  # Keep .hydra folder in run dir

@@ -83,19 +83,40 @@ class BananaDataModule(L.LightningDataModule):
     def __init__(
         self,
         data_dir: str = "data",
+        dataset_name: str = "banana-ripeness",  # Added for ML naming system
         batch_size: int = 32,
         num_workers: int = 4,
         img_size: Tuple[int, int] = (224, 224),
         use_augmentation: bool = False,
-        pin_memory: bool = True
+        pin_memory: bool = True,
+        # Additional parameters from config
+        train_split: float = 0.7,
+        val_split: float = 0.15,
+        test_split: float = 0.15,
+        normalize: bool = True,
+        augment_train: bool = True,
+        use_class_weights: bool = True,
+        cache_dataset: bool = False,
+        **kwargs  # Accept any additional parameters
     ):
         super().__init__()
         self.data_dir = data_dir
+        self.dataset_name = dataset_name  # Store for experiment naming
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.img_size = img_size
-        self.use_augmentation = use_augmentation
+        self.use_augmentation = use_augmentation or augment_train
         self.pin_memory = pin_memory
+
+        # Data splits (for future use if implementing custom splitting)
+        self.train_split = train_split
+        self.val_split = val_split
+        self.test_split = test_split
+
+        # Additional options
+        self.normalize = normalize
+        self.use_class_weights = use_class_weights
+        self.cache_dataset = cache_dataset
 
         # Ripeness classes
         self.classes = ['overripe', 'ripe', 'rotten', 'unripe']
