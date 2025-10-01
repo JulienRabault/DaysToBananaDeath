@@ -123,8 +123,8 @@ class BananaDataModule(L.LightningDataModule):
         self.num_classes = len(self.classes)
 
         # ImageNet statistics for normalization
-        self.mean = [0.485, 0.456, 0.406]
-        self.std = [0.229, 0.224, 0.225]
+        self.mean = (0.485, 0.456, 0.406)  # Use tuples for type safety
+        self.std = (0.229, 0.224, 0.225)
 
     def get_transforms(self, split: str):
         """Returns appropriate transformations for each split."""

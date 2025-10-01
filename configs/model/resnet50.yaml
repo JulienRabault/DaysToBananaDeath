@@ -5,7 +5,7 @@ _target_: src.model.ResNetClassifier
 model_name: "resnet50"
 pretrained: true
 freeze_backbone: false
-dropout_rate: 0.5
+dropout_rate: 0.3
 
 # Training parameters
 num_classes: 4

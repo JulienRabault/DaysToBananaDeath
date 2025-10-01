@@ -2,7 +2,7 @@
 _target_: lightning.pytorch.trainer.Trainer
 
 # Training configuration
-max_epochs: 10
+max_epochs: 15
 accelerator: "auto"
 devices: "auto"
 precision: "16-mixed"

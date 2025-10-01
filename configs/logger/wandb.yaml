@@ -3,22 +3,23 @@ _target_: lightning.pytorch.loggers.WandbLogger
 
 # Project settings
 project: "banana-classification"
-name: null  # Will be set by trainer_helper
-save_dir: null  # Will be set by trainer_helper
+name: null  # Sera défini automatiquement par trainer_helper
+save_dir: null  # Sera défini automatiquement par trainer_helper
 
-# W&B specific settings
-log_model: "all"  # Log model checkpoints
+# W&B specific settings - GESTION AUTOMATIQUE DES ARTIFACTS
+log_model: true  # Sauvegarde automatiquement tous les checkpoints comme artifacts
 offline: false
 id: null
 anonymous: null
-version: null
-tags: null  # Will be set from experiment config
+resume: "never"  # Assure un nouveau run à chaque fois
+
+tags: null  # Sera défini depuis experiment config
 
 # Logging behavior
 prefix: ""
 job_type: "train"
-group: null
-notes: null  # Will be set from experiment config
+group: null  # Sera défini automatiquement (nom de l'expérience)
+notes: null  # Sera défini automatiquement
 
 # Settings
 save_code: true
