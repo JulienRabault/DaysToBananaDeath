@@ -1,141 +1,124 @@
-# DaysToBananaDeath - Banana Ripeness Classification
+# 🍌 BananaCheck - MLOps Learning Project
 
-## Description
+A modern ML project showcasing **MLOps best practices** with banana ripeness classification.
 
-Projet de classification de la maturité des bananes utilisant des techniques d'intelligence artificielle. Le système permet de déterminer automatiquement le stade de maturité d'une banane à partir d'images.
+## 🎯 Project Goals
 
-## Classes de maturité
+This project was built as a learning exercise to master key MLOps technologies:
 
-- **unripe** : Bananes vertes/pas mûres
-- **ripe** : Bananes mûres 
-- **overripe** : Bananes trop mûres
-- **rotten** : Bananes pourries
-- **unknowns** : Images non classifiées
+- **Configuration Management** with Hydra
+- **Experiment Tracking & Model Versioning** with Weights & Biases
+- **API Development** with FastAPI
+- **Model Deployment** with ONNX Runtime
+- **Web Interface** with Streamlit
 
-## Dataset
+## 🚀 Features
 
-Ce projet utilise plusieurs sources de données :
+- **AI-powered banana ripeness estimation** (days remaining before spoilage)
+- **REST API** for programmatic access
+- **Web interface** for easy image upload and prediction
+- **Model versioning** and artifact management via W&B
+- **Production-ready deployment** with Docker support
 
-### Dataset principal
-Source : [BananaRipeness](https://github.com/luischuquim/BananaRipeness/)
+## 🛠️ Tech Stack
 
-**Citation :**
-```bibtex
-@conference{visapp23,
-  author={Luis Chuquimarca. and Boris Vintimilla. and Sergio Velastin.},
-  title={Banana Ripeness Level Classification Using a Simple CNN Model Trained with Real and Synthetic Datasets},
-  booktitle={Proceedings of the 18th International Joint Conference on Computer Vision, Imaging and Computer Graphics Theory and Applications - Volume 5: VISAPP, (VISIGRAPP 2023)},
-  year={2023},
-  pages={536-543},
-  publisher={SciTePress},
-  organization={INSTICC},
-  doi={10.5220/0011654600003417},
-  isbn={978-989-758-634-7},
-  issn={2184-4321},
-}
-```
+### Core ML/MLOps
+- **PyTorch Lightning** - Training framework
+- **Hydra** - Configuration management
+- **Weights & Biases** - Experiment tracking, model versioning
+- **ONNX Runtime** - Model inference optimization
 
-### Datasets additionnels
-- Dataset YOLO pour détection de bananes
-- Dataset v1 (base existante)
-- Dataset v2 (version consolidée et optimisée)
+### API & Web
+- **FastAPI** - REST API with automatic documentation
+- **Streamlit** - Interactive web interface
+- **Uvicorn** - ASGI server
 
-## Structure du projet
+### Data & Vision
+- **Albumentations** - Image augmentation pipeline
+- **PIL/OpenCV** - Image processing
 
-```
-DaysToBananaDeath/
-├── src/                    # Code source
-│   ├── api.py             # API REST
-│   ├── model.py           # Modèles d'IA
-│   ├── dataset.py         # Gestion des datasets
-│   ├── train.py           # Entraînement
-│   └── inference.py       # Inférence
-├── configs/               # Configuration
-├── scripts/               # Scripts utilitaires
-└── outputs/               # Résultats d'entraînement
-```
+## 📊 Model Performance
 
-## Dataset v2 (Actuel)
+- **Architecture**: ResNet50 & Vision Transformer (ViT-B/16)
+- **Dataset**: 20K+ banana images across 5 ripeness stages
+- **Classes**: unripe, ripe, overripe, rotten, unknowns
+- **Deployment**: ONNX optimized for CPU inference
 
-**Statistiques finales :**
-- **TRAIN** : 16,761 images
-  - unripe: 3,152 images
-  - ripe: 4,490 images  
-  - overripe: 2,684 images
-  - rotten: 4,435 images
-  - unknowns: 2,000 images
+## 🔧 Quick Start
 
-- **VALID** : 2,268 images
-  - unripe: 539 images
-  - ripe: 611 images
-  - overripe: 341 images
-  - rotten: 527 images
-  - unknowns: 250 images
-
-- **TEST** : 1,784 images
-  - unripe: 521 images
-  - ripe: 465 images
-  - overripe: 225 images
-  - rotten: 323 images
-  - unknowns: 250 images
-
-**Total : 20,813 images**
-
-## API
-
-L'API REST permet de classifier des images de bananes en temps réel.
-
-### Endpoints
-- `POST /predict` : Classification d'une image
-- `GET /health` : État de santé du service
-
-## Installation
-
+### API Usage
 ```bash
-# Installation des dépendances
+# Start the API
+uvicorn src.api:app --host 0.0.0.0 --port 8000
+
+# Test prediction
+curl -X POST "http://localhost:8000/predict" \
+     -H "Content-Type: multipart/form-data" \
+     -F "file=@banana.jpg"
+```
+
+### Web Interface
+```bash
+# Start Streamlit app
+streamlit run streamlit_app.py
+
+# Navigate to http://localhost:8501
+```
+
+### Environment Setup
+```bash
 pip install -r requirements.txt
 
-# Lancement de l'API
-python src/api.py
+# For W&B model loading
+export WANDB_API_KEY=your_api_key
 ```
 
-## Utilisation
+## 📁 Project Structure
 
-```python
-# Exemple d'utilisation de l'API
-import requests
-
-# Classification d'une image
-with open('banana.jpg', 'rb') as f:
-    response = requests.post('http://localhost:8000/predict', 
-                           files={'file': f})
-    
-result = response.json()
-print(f"Classe prédite: {result['class']}")
-print(f"Confiance: {result['confidence']}")
+```
+├── src/
+│   ├── api.py              # FastAPI REST endpoint
+│   ├── model.py            # Model architectures
+│   ├── train.py            # Training pipeline
+│   └── inference.py        # Inference utilities
+├── configs/                # Hydra configuration files
+├── streamlit_app.py        # Web interface
+├── requirements.txt        # Python dependencies
+└── Procfile               # Deployment configuration
 ```
 
-## Modèles
+## 🧠 Key Learning Outcomes
 
-- **ResNet50** : Modèle de base avec transfer learning
-- **ViT-B/16** : Vision Transformer pour comparaison
+### Hydra Configuration Management
+- Structured config files for different components (model, data, training)
+- Easy experiment switching with config overrides
+- Environment-specific configurations
 
-## Technologies
+### W&B MLOps Pipeline
+- Automated experiment tracking with metrics logging
+- Model artifact versioning and storage
+- Seamless model deployment from artifacts
+- Training curve visualization and comparison
 
-- **Python 3.13**
-- **PyTorch** / **PyTorch Lightning**
-- **FastAPI** pour l'API REST
-- **Hydra** pour la configuration
-- **Weights & Biases** pour le tracking des expériences
+### Production API Design
+- RESTful API with proper error handling
+- Automatic model loading from W&B artifacts
+- Health checks and monitoring endpoints
+- ONNX optimization for fast inference
 
-## Auteurs
+## 📋 Dataset Sources
 
-- Équipe DaysToBananaDeath
+Built using established vision datasets:
+- [BananaRipeness Dataset](https://github.com/luischuquim/BananaRipeness/) by Chuquimarca et al.
+- Additional synthetic and augmented data
 
-## License
+## 🚢 Deployment
 
-[À définir]
+The project includes production-ready deployment configurations:
+- **Heroku/Railway**: via Procfile
+- **Docker**: containerized deployment
+- **Environment variables**: for secure API key management
 
 ---
 
-*Projet généré le 2 octobre 2025*
+*Built to explore modern MLOps practices and deployment strategies**
