@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-Streamlit app for Banana Ripeness Classification using ONNX Runtime.
-- Télécharge le modèle ONNX depuis W&B (ou utilise un chemin local via env)
-- Permet d'uploader une image, d'afficher la prédiction et les probabilités
-- Conserve la session du modèle en cache pour éviter les re-téléchargements
-
-Variables d'environnement utiles:
-- WANDB_API_KEY : clé API Weights & Biases pour télécharger l'artifact
-- MODEL_ONNX_PATH : chemin local vers un modèle .onnx (prioritaire si défini)
-- MODEL_ONNX_URL  : URL pour télécharger un modèle .onnx
-- WANDB_MODEL_ARTIFACT : nom d'artifact W&B (par défaut: jrabault/banana-classification-unknown/onnx:v0)
-"""
-
 from __future__ import annotations
 
 import os
@@ -26,9 +13,28 @@ import onnxruntime as ort
 from PIL import Image
 import streamlit as st
 
+# Chargement .env pour usage local
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # ignore errors si absent
+except Exception:
+    pass
+
 CLASSES = ["overripe", "ripe", "rotten", "unripe", "unknowns"]
-DEFAULT_WANDB_ARTIFACT = os.environ.get(
-    "WANDB_MODEL_ARTIFACT", "jrabault/banana-classification-unknown/onnx:v0"
+# Jours restants approximatifs par classe (heuristique)
+CLASS_TO_DAYS = {
+    "unripe": 5.0,     # verte → plusieurs jours
+    "ripe": 2.0,       # mûre → quelques jours
+    "overripe": 0.5,   # trop mûre → < 1 jour
+    "rotten": 0.0,     # pourrie → 0
+    "unknowns": 2.0,   # par défaut neutre
+}
+
+# Choix de l'artifact W&B à partir de différentes variables d'env possibles
+DEFAULT_WANDB_ARTIFACT = (
+    os.environ.get("WANDB_MODEL_ARTIFACT")
+    or os.environ.get("DEFAULT_WANDB_ARTIFACT")
+    or "jrabault/banana-classification-unknown/onnx:latest"
 )
 
 
@@ -62,7 +68,6 @@ def _to_numpy_chw_float32(tensor_like) -> np.ndarray:
 def load_model_session() -> Dict:
     """Charge le modèle ONNX en mémoire et retourne un dict {session, transform, tempdir, model_path}."""
     model_path_env = os.environ.get("MODEL_ONNX_PATH")
-    model_url_env = os.environ.get("MODEL_ONNX_URL")
     transform = _setup_transform()
 
     temp_dir_obj: Optional[tempfile.TemporaryDirectory] = None
@@ -70,27 +75,6 @@ def load_model_session() -> Dict:
 
     if model_path_env:
         model_path = model_path_env
-    elif model_url_env:
-        # Téléchargement via URL -> fichier temporaire
-        try:
-            import requests
-            temp_dir_obj = tempfile.TemporaryDirectory(prefix="onnx_url_")
-            local_path = Path(temp_dir_obj.name) / "model.onnx"
-            with requests.get(model_url_env, stream=True, timeout=60) as r:
-                r.raise_for_status()
-                with open(local_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-            model_path = str(local_path)
-        except Exception as e:  # noqa: BLE001
-            return {
-                "session": None,
-                "transform": transform,
-                "tempdir": temp_dir_obj,
-                "model_path": model_path,
-                "error": f"Téléchargement URL échoué: {e}",
-            }
     else:
         # Téléchargement via W&B
         try:
@@ -152,25 +136,38 @@ def softmax(x: np.ndarray) -> np.ndarray:
     return exp_x / np.sum(exp_x)
 
 
-def predict(image: Image.Image, session: ort.InferenceSession, transform: A.Compose) -> Dict:
+def expected_days_from_probs(probs: np.ndarray) -> float:
+    """Calcule l'espérance de jours restants à partir des probabilités par classe."""
+    # Aligne les jours selon l'ordre CLASSES
+    days_vec = np.array([CLASS_TO_DAYS[c] for c in CLASSES], dtype=np.float32)
+    return float(np.dot(probs, days_vec))
+
+
+def predict_days(image: Image.Image, session: ort.InferenceSession, transform: A.Compose) -> Dict:
     batch = preprocess_image(image, transform)
     input_name = session.get_inputs()[0].name
     outputs = session.run(None, {input_name: batch})
     logits = outputs[0][0]
     probs = softmax(logits)
+
+    # Estimation en jours (espérance)
+    days = expected_days_from_probs(probs)
+
+    # Mesure simple de fiabilité = proba de la classe majoritaire
     top_idx = int(np.argmax(probs))
+    confidence = float(probs[top_idx])
+
     return {
-        "predicted_class": CLASSES[top_idx],
-        "confidence": float(probs[top_idx]),
-        "probabilities": {c: float(probs[i]) for i, c in enumerate(CLASSES)},
+        "days_left": days,
+        "confidence": confidence,
     }
 
 
 # ------------- UI -------------
-st.set_page_config(page_title="BananaCheck - Maturité des bananes", page_icon="🍌", layout="centered")
+st.set_page_config(page_title="BananaCheck - Jours restants", page_icon="🍌", layout="centered")
 
 st.title("🍌 BananaCheck")
-st.caption("Classification de la maturité des bananes (unripe, ripe, overripe, rotten, unknowns)")
+st.caption("Estimation du nombre de jours restants avant que la banane ne soit impropre à la consommation")
 
 state = load_model_session()
 
@@ -181,7 +178,8 @@ with st.sidebar:
     if state.get("error"):
         st.error(
             "Impossible de charger le modèle via W&B/URL.\n"
-            "Définissez WANDB_API_KEY + WANDB_MODEL_ARTIFACT, ou MODEL_ONNX_PATH/URL.\n\n"
+            "Définissez WANDB_API_KEY + (WANDB_MODEL_ARTIFACT|DEFAULT_WANDB_ARTIFACT),\n"
+            "ou MODEL_ONNX_PATH / MODEL_ONNX_URL.\n\n"
             f"Erreur: {state['error']}"
         )
         st.info(
@@ -213,33 +211,36 @@ with col1:
         st.info("Uploadez une image ou utilisez la caméra pour démarrer.")
 
 with col2:
-    st.subheader("Résultat")
+    st.subheader("Estimation")
     if img_file is not None:
         if state.get("session") is None:
             st.warning("Le modèle n'est pas disponible. Vérifiez la configuration (W&B/URL/chemin).")
         else:
-            with st.spinner("Prédiction en cours..."):
+            with st.spinner("Calcul en cours..."):
                 try:
-                    res = predict(image, state["session"], state["transform"])
-                    st.metric("Classe prédite", res["predicted_class"],
-                              delta=f"confiance {res['confidence']*100:.1f}%")
+                    res = predict_days(image, state["session"], state["transform"])
+                    days_left = res["days_left"]
+                    conf = res["confidence"]
 
-                    # Bar chart des probabilités
-                    import pandas as pd  # streamlit dépend déjà de pandas
+                    # Affichage principal: jours restants (arrondi à 0.5 près)
+                    rounded = max(0.0, round(days_left * 2) / 2.0)
+                    label = "jour" if abs(rounded - 1.0) < 1e-6 else "jours"
+                    st.metric("Jours restants (estimation)", f"~ {rounded} {label}")
 
-                    df = pd.DataFrame({"classe": list(res["probabilities"].keys()),
-                                       "probabilité": list(res["probabilities"].values())})
-                    df = df.set_index("classe")
-                    st.bar_chart(df)
+                    # Indication de fiabilité simple
+                    st.caption(f"Indice de fiabilité: {conf*100:.0f}%")
+
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Erreur pendant l'inférence: {e}")
 
 st.divider()
 st.markdown(
     """
-    - Modèle: ONNX Runtime (CPU) • Normalisation ImageNet • 224x224
-    - Classes: overripe, ripe, rotten, unripe, unknowns
-    - Source du modèle: W&B Artifact, URL, ou chemin local
+    Notes:
+    - Estimation dérivée d'un modèle de classification (unripe/ripe/overripe/rotten/unknowns)
+      convertie en jours restants via une heuristique simple.
+    - Valeurs indicatives: unripe≈5j, ripe≈2j, overripe≈0.5j, rotten≈0j, unknowns≈2j.
+    - Pour plus de précision, entraînez un modèle de régression en jours.
     """
 )
 
