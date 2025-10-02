@@ -186,7 +186,7 @@ with col1:
         st.info("Upload an image or use the camera to start.")
 
 with col2:
-    st.subheader("Prediction")
+    st.subheader("## Prediction")
     if img_file is not None:
         if state.get("session") is None:
             st.warning("Model not available. Check configuration.")
@@ -198,7 +198,6 @@ with col2:
 
                     if not res["is_banana"]:
                         # Not a banana case
-                        st.markdown("### 🤔")
                         st.markdown("## **Is this even a banana?**")
                         st.caption(f"Confidence: {conf*100:.0f}%")
                     else:
@@ -206,8 +205,6 @@ with col2:
                         days_left = res["days_left"]
                         rounded = max(0.0, round(days_left * 2) / 2.0)
                         label = "day" if abs(rounded - 1.0) < 1e-6 else "days"
-
-                        st.markdown("### 📅")
                         st.markdown("## **Estimated remaining days**")
                         st.markdown(f"# **~ {rounded} {label}**")
                         st.caption(f"Confidence: {conf*100:.0f}%")
