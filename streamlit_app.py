@@ -186,7 +186,6 @@ with col1:
         st.info("Upload an image or use the camera to start.")
 
 with col2:
-    st.subheader("## Prediction")
     if img_file is not None:
         if state.get("session") is None:
             st.warning("Model not available. Check configuration.")
