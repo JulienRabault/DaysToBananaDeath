@@ -8,4 +8,4 @@ albumentations==2.0.8
 wandb==0.19.2
 python-dotenv==1.0.1
 streamlit
-pytorch
+torch
