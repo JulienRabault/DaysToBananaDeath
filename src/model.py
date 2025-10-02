@@ -9,6 +9,7 @@ import lightning as L
 import torchvision.models as models
 import torchmetrics
 from typing import Optional
+import torchvision.transforms as transforms
 
 
 class BaseBananaClassifier(L.LightningModule):
@@ -16,7 +17,7 @@ class BaseBananaClassifier(L.LightningModule):
 
     def __init__(
         self,
-        num_classes: int = 4,
+        num_classes: int = 5,  # Updated from 4 to 5 classes
         learning_rate: float = 1e-3,
         weight_decay: float = 1e-4,
         scheduler: str = "cosine",  # "cosine", "step", "plateau", "none"
@@ -30,7 +31,7 @@ class BaseBananaClassifier(L.LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.scheduler = scheduler
-        self.class_names = ['overripe', 'ripe', 'rotten', 'unripe']
+        self.class_names = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']  # Added 'unknowns' class
 
         # Metrics collections
         self.train_metrics = torchmetrics.MetricCollection(
@@ -284,4 +285,3 @@ class VisionTransformerClassifier(BaseBananaClassifier):
     def forward(self, x):
         features = self.backbone(x)
         return self.classifier(features)
-

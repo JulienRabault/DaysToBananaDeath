@@ -4,12 +4,12 @@ _target_: lightning.pytorch.callbacks.ModelCheckpoint
 # Monitoring
 monitor: "val/accuracy"
 mode: "max"
-save_top_k: 3
-save_last: true
+save_top_k: 2        # Keep only the single best checkpoint
+save_last: true      # Also keep the final (last) checkpoint for resuming/debug
 save_weights_only: false
 
-# File naming
-filename: "epoch_{epoch:02d}_val_accuracy_{val/accuracy:.3f}"
+# File naming (best will still include its epoch and metric)
+filename: "best_epoch_{epoch:02d}_val_accuracy_{val/accuracy:.3f}"
 auto_insert_metric_name: false
 
 # Directory

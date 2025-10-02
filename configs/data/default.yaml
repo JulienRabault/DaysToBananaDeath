@@ -2,7 +2,7 @@
 _target_: src.dataset.BananaDataModule
 
 # Dataset configuration
-data_dir: "/mnt/data/WORK/DATA/"
+data_dir: "/mnt/data/WORK/DATA/datasetv3/"
 
 # Data loading
 batch_size: 32
@@ -18,10 +18,10 @@ test_split: 0.15
 img_size: [224, 224]
 normalize: true
 
-augment_train: False
+augment_train: true
 
 # Class balancing
-use_class_weights: true
+use_class_weights: false
 
 # Caching
 cache_dataset: false

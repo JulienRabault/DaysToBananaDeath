@@ -24,7 +24,7 @@ class BananaRipenessDataset(Dataset):
         self.transform = transform
 
         # Banana ripeness classes
-        self.classes = ['overripe', 'ripe', 'rotten', 'unripe']
+        self.classes = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
 
         # Load image paths and their labels
@@ -119,12 +119,12 @@ class BananaDataModule(L.LightningDataModule):
         self.cache_dataset = cache_dataset
 
         # Ripeness classes
-        self.classes = ['overripe', 'ripe', 'rotten', 'unripe']
+        self.classes = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']
         self.num_classes = len(self.classes)
 
         # ImageNet statistics for normalization
-        self.mean = [0.485, 0.456, 0.406]
-        self.std = [0.229, 0.224, 0.225]
+        self.mean = (0.485, 0.456, 0.406)  # Use tuples for type safety
+        self.std = (0.229, 0.224, 0.225)
 
     def get_transforms(self, split: str):
         """Returns appropriate transformations for each split."""

@@ -90,14 +90,13 @@ class ExperimentManager:
         # Base run name without uniqueness suffix
         base_run_name = "_".join(components)
 
-        # Use uniqpath to ensure uniqueness with timestamp format
-        # This will add _{timestamp} if needed to avoid conflicts
+        # Always add a timestamp + short random suffix to ensure uniqueness even within the same second
         return unique_path(
             base_run_name,
-            suffix_format="_{timestamp}",
-            if_exists_only=False,  # Always add suffix for better organization
-            return_str=True
-        ) if hasattr(unique_path(base_run_name, suffix_format="_{timestamp}", if_exists_only=False, return_str=False), 'name') else str(unique_path(base_run_name, suffix_format="_{timestamp}", if_exists_only=False, return_str=True))
+            suffix_format="_{timestamp}_{rand:6}",
+            if_exists_only=False,
+            return_str=True,
+        )
 
     def _generate_version(self) -> str:
         """Generate semantic version following ML versioning best practices."""
@@ -126,8 +125,8 @@ class ExperimentManager:
         (unique_output_dir / "checkpoints").mkdir(exist_ok=True)
         (unique_output_dir / "logs").mkdir(exist_ok=True)
         (unique_output_dir / "artifacts").mkdir(exist_ok=True)
-        (unique_output_dir / "metrics").mkdir(exist_ok=True)
-        (unique_output_dir / "plots").mkdir(exist_ok=True)
+        # (unique_output_dir / "metrics").mkdir(exist_ok=True)
+        # (unique_output_dir / "plots").mkdir(exist_ok=True)
 
         return unique_output_dir
 
@@ -212,7 +211,13 @@ class ComponentFactory:
         """Create logger from configuration with proper ML naming."""
         logger_cfg = cfg.logger.copy()
 
-        # Use the run_name (descriptive) for WandB, not experiment_name
+        # Ensure we never resume an old run implicitly
+        os.environ["WANDB_RESUME"] = "never"
+        # Clear any preset run identifiers that could force resume
+        os.environ.pop("WANDB_RUN_ID", None)
+        os.environ.pop("WANDB_RUN_NAME", None)
+
+        # Use the run_name (descriptive) for WandB
         logger_cfg.name = experiment_manager.run_name
         logger_cfg.save_dir = experiment_manager.get_logs_dir()
 
@@ -223,9 +228,20 @@ class ComponentFactory:
         if hasattr(logger_cfg, 'group'):
             logger_cfg.group = experiment_manager.experiment_name
 
-        # Add version info
+        # Do NOT set WandB "version" here because WandbLogger may treat it as the run id
         if hasattr(logger_cfg, 'version'):
-            logger_cfg.version = experiment_manager.version
+            # Remove/ignore any provided version to avoid collisions
+            try:
+                del logger_cfg["version"]
+            except Exception:
+                logger_cfg.version = None
+
+        # Force a new unique run id every time
+        import uuid
+        logger_cfg.id = str(uuid.uuid4())
+
+        # Explicitly disable resume behavior
+        logger_cfg.resume = "never"
 
         # Set notes from metadata
         metadata = experiment_manager.get_run_metadata()
@@ -266,35 +282,41 @@ class ComponentFactory:
 
 
 class ModelArtifactManager:
-    """Manages model artifacts and W&B integration with ML naming conventions."""
+    """Manages model artifacts with simplified approach."""
 
     def __init__(self, experiment_manager: ExperimentManager, cfg: DictConfig):
         self.experiment_manager = experiment_manager
         self.cfg = cfg
 
     def save_model_artifacts(self, model: L.LightningModule, trainer: L.Trainer) -> None:
-        """Save model artifacts to W&B and local storage."""
-        if not self._is_wandb_enabled():
-            return
-
+        """Save model artifacts - local config + WandB ONNX artifact."""
         artifacts_dir = Path(self.experiment_manager.get_artifacts_dir())
 
-        # Get best checkpoint path
+        # Toujours sauvegarder la config localement
+        self._save_config(artifacts_dir)
+
+        # Sauvegarder ONNX localement et comme artifact WandB
         best_checkpoint_path = self._get_best_checkpoint(trainer)
-        if not best_checkpoint_path:
-            print("Warning: No best checkpoint found")
-            return
+        if best_checkpoint_path:
+            # Sauvegarder ONNX localement
+            onnx_path = self._save_onnx_model(model, best_checkpoint_path, artifacts_dir)
 
-        # Load best model
-        best_model = type(model).load_from_checkpoint(best_checkpoint_path)
+            # Si WandB est activé, créer un artifact ONNX unique pour ce run
+            if self._is_wandb_enabled() and onnx_path and onnx_path.exists():
+                self._create_onnx_wandb_artifact(trainer, onnx_path)
 
-        # Save different model formats
-        self._save_state_dict(best_model, artifacts_dir)
-        self._save_full_model(best_model, artifacts_dir)
-        self._save_onnx_model(best_model, artifacts_dir)
+    def _save_config(self, artifacts_dir: Path) -> None:
+        """Save experiment configuration to artifacts directory."""
+        import yaml
+        config_path = artifacts_dir / "config.yaml"
 
-        # Create W&B artifact with proper naming
-        self._create_wandb_artifact(artifacts_dir, trainer, best_checkpoint_path)
+        # Convert DictConfig to regular dict for serialization
+        config_dict = dict(self.cfg)
+
+        with open(config_path, 'w') as f:
+            yaml.dump(config_dict, f, default_flow_style=False, indent=2)
+
+        print(f"✅ Configuration saved to {config_path}")
 
     def _is_wandb_enabled(self) -> bool:
         """Check if W&B logging is enabled."""
@@ -302,52 +324,39 @@ class ModelArtifactManager:
                 'WandbLogger' in self.cfg.logger._target_)
 
     def _get_best_checkpoint(self, trainer: L.Trainer) -> Optional[str]:
-        """Get path to best checkpoint (robust across Lightning versions)."""
-        # Prefer scanning callbacks for ModelCheckpoint
+        """Get path to best checkpoint."""
         best_path: Optional[str] = None
         for cb in getattr(trainer, 'callbacks', []) or []:
             if isinstance(cb, ModelCheckpoint):
                 if getattr(cb, 'best_model_path', None):
                     best_path = cb.best_model_path
                     break
-        # Fallback to trainer.checkpoint_callback if available
         if not best_path and hasattr(trainer, 'checkpoint_callback') and trainer.checkpoint_callback:
             best_path = getattr(trainer.checkpoint_callback, 'best_model_path', None)
         return best_path
 
-    def _save_state_dict(self, model: L.LightningModule, artifacts_dir: Path) -> None:
-        """Save model state dict."""
-        state_dict_path = artifacts_dir / "model_state_dict.pt"
-        torch.save(model.state_dict(), state_dict_path)
-
-    def _save_full_model(self, model: L.LightningModule, artifacts_dir: Path) -> None:
-        """Save full model."""
-        full_model_path = artifacts_dir / "full_model.pt"
-        torch.save(model, full_model_path)
-
-    def _save_onnx_model(self, model: L.LightningModule, artifacts_dir: Path) -> None:
+    def _save_onnx_model(self, model: L.LightningModule, checkpoint_path: str, artifacts_dir: Path) -> Optional[Path]:
         """Save model in ONNX format."""
         try:
             import onnx
         except ImportError:
             print("⚠️ ONNX export skipped: 'onnx' package not installed.")
-            print("   To enable ONNX export, install with: pip install onnx onnxruntime")
-            print("   Or update dependencies with: uv sync")
-            return
+            return None
 
         try:
+            # Charger le meilleur modèle depuis le checkpoint
+            best_model = type(model).load_from_checkpoint(checkpoint_path)
+            best_model.eval()
+
             onnx_path = artifacts_dir / "model.onnx"
 
             # Create dummy input on the same device as the model
-            device = next(model.parameters()).device
+            device = next(best_model.parameters()).device
             dummy_input = torch.randn(1, 3, 224, 224, device=device)
 
-            # Set model to eval mode for export
-            model.eval()
-
             torch.onnx.export(
-                model,
-                (dummy_input,),  # inputs as tuple
+                best_model,
+                (dummy_input,),
                 onnx_path,
                 export_params=True,
                 opset_version=11,
@@ -357,50 +366,108 @@ class ModelArtifactManager:
                 dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
             )
             print(f"✅ ONNX model saved to {onnx_path}")
+            return onnx_path
         except Exception as e:
             print(f"❌ Failed to export ONNX model: {e}")
-            print("   This is optional - training artifacts will still be saved.")
+            return None
 
-    def _create_wandb_artifact(self, artifacts_dir: Path, trainer: L.Trainer, checkpoint_path: str) -> None:
-        """Create and log W&B artifact with proper ML naming."""
-        # Use semantic artifact naming: dataset-model-version
-        metadata = self.experiment_manager.get_run_metadata()
-        artifact_name = f"{metadata['dataset']}-{metadata['model_architecture']}-{self.experiment_manager.version}"
+    def _create_onnx_wandb_artifact(self, trainer: L.Trainer, onnx_path: Path) -> None:
+        """Create WandB artifact for ONNX model - shared 'onnx' artifact for easy deployment."""
+        try:
+            # Vérifier que le logger WandB est disponible
+            if not hasattr(trainer, 'logger') or trainer.logger is None:
+                print("⚠️ Pas de logger disponible")
+                return
 
-        artifact = wandb.Artifact(
-            name=artifact_name,
-            type="model",
-            description=f"Banana ripeness classifier using {metadata['model_architecture']} - {self.experiment_manager.run_name}",
-            metadata={
-                "framework": "pytorch-lightning",
-                "experiment": self.experiment_manager.experiment_name,
-                "run_name": self.experiment_manager.run_name,
-                "version": self.experiment_manager.version,
-                "architecture": metadata['model_architecture'],
-                "dataset": metadata['dataset'],
-                "num_classes": metadata['num_classes'],
-                "best_val_accuracy": float(trainer.callback_metrics.get("val/accuracy", 0)),
-                "best_val_f1": float(trainer.callback_metrics.get("val/f1", 0)),
-                "epochs_trained": trainer.current_epoch,
-                "hyperparameters": metadata['hyperparameters'],
-                "created_at": metadata['created_at'],
-                "tags": self.experiment_manager.get_run_tags(),
-            }
-        )
+            if not hasattr(trainer.logger, 'experiment') or trainer.logger.experiment is None:
+                print("⚠️ Logger WandB non disponible")
+                return
 
-        # Add files to artifact
-        for file_path in artifacts_dir.glob("*"):
-            if file_path.is_file():
-                artifact.add_file(str(file_path))
+            # Récupérer les infos du run
+            run_name = trainer.logger.experiment.name
+            metric_value = trainer.callback_metrics.get("val/accuracy", 0)
+            current_accuracy = float(metric_value) if metric_value is not None else 0.0
 
-        # Add checkpoint
-        if os.path.exists(checkpoint_path):
-            artifact.add_file(checkpoint_path, name="best_checkpoint.ckpt")
+            # Nom d'artifact COMMUN pour le déploiement
+            artifact_name = "onnx"
 
-        # Log artifact
-        wandb.log_artifact(artifact)
-        print(f"✅ Model artifacts logged to W&B: {artifact_name}")
+            # Récupérer le meilleur modèle existant pour comparaison
+            best_accuracy_so_far = self._get_current_best_accuracy(trainer)
+            is_best_model = current_accuracy > best_accuracy_so_far
 
+            if is_best_model:
+                print(f"   🏆 NOUVEAU MEILLEUR MODÈLE! {current_accuracy:.4f} > {best_accuracy_so_far:.4f}")
+            else:
+                print(f"   📊 Modèle actuel: {current_accuracy:.4f} (meilleur: {best_accuracy_so_far:.4f})")
+
+            # Créer l'artifact
+            artifact = wandb.Artifact(
+                name=artifact_name,
+                type="model",
+                description=f"ONNX models for deployment - Latest from: {run_name} (val_accuracy: {current_accuracy:.4f})",
+                metadata={
+                    "latest_run": run_name,
+                    "latest_accuracy": current_accuracy,
+                    "best_accuracy": max(current_accuracy, best_accuracy_so_far),
+                    "format": "onnx",
+                    "framework": "pytorch-lightning",
+                    "opset_version": 11,
+                    "input_shape": [1, 3, 224, 224],
+                    "deployment_ready": True,
+                    "updated_at": datetime.now().isoformat(),
+                    "is_best_model": is_best_model
+                }
+            )
+
+            # Ajouter le fichier ONNX avec nom incluant le run pour traçabilité
+            artifact.add_file(str(onnx_path), name=f"model-{run_name}.onnx")
+
+            # Définir les aliases pour le déploiement
+            aliases = ["latest"]  # Toujours "latest" pour le dernier modèle
+
+            if is_best_model:
+                aliases.append("best")
+                print(f"   🎯 Modèle marqué comme BEST et remplace l'ancien meilleur")
+            else:
+                print(f"   📝 Modèle marqué comme LATEST seulement")
+
+            # Logger l'artifact avec les alias appropriés
+            trainer.logger.experiment.log_artifact(artifact, aliases=aliases)
+
+            print(f"✅ ONNX WandB artifact updated: {artifact_name}")
+            print(f"   Fichier ajouté: model-{run_name}.onnx")
+            print(f"   Aliases: {aliases}")
+            print(f"   📦 Pour déploiement: utilisez l'artifact 'onnx' avec alias 'best' ou 'latest'")
+
+        except Exception as e:
+            print(f"⚠️ Erreur lors de la création de l'artifact WandB: {e}")
+
+    def _get_current_best_accuracy(self, trainer: L.Trainer) -> float:
+        """Récupère la meilleure accuracy de l'artifact ONNX existant."""
+        try:
+            # Essayer de récupérer l'artifact ONNX existant avec tag "best"
+            api = wandb.Api()
+            project_name = trainer.logger.experiment.project
+
+            try:
+                # Chercher l'artifact avec tag "best"
+                artifact = api.artifact(f"{project_name}/onnx:best")
+                best_accuracy = artifact.metadata.get("best_accuracy", 0.0)
+                print(f"   📋 Meilleur modèle existant trouvé: {best_accuracy:.4f}")
+                return best_accuracy
+            except wandb.errors.CommError:
+                # Pas d'artifact "best" existant, essayer "latest"
+                try:
+                    artifact = api.artifact(f"{project_name}/onnx:latest")
+                    latest_accuracy = artifact.metadata.get("latest_accuracy", 0.0)
+                    print(f"   📋 Dernier modèle trouvé: {latest_accuracy:.4f}")
+                    return latest_accuracy
+                except wandb.errors.CommError:
+                    print(f"   📋 Aucun artifact ONNX existant, ce sera le premier")
+                    return 0.0
+        except Exception as e:
+            print(f"   ⚠️ Erreur lors de la récupération du meilleur modèle: {e}")
+            return 0.0
 
 class TrainingOrchestrator:
     """Orchestrates the entire training process following SOLID principles."""
@@ -454,7 +521,7 @@ class TrainingOrchestrator:
         """Setup data module."""
         print("📊 Setting up data module...")
         datamodule = self.component_factory.create_datamodule(self.cfg)
-        datamodule.setup(stage=None)
+        datamodule.setup(stage="fit")
 
         # Print dataset info
         if hasattr(datamodule, 'print_dataset_info'):
@@ -523,6 +590,7 @@ class TrainingOrchestrator:
 
 
 # Public API functions
+
 def create_training_orchestrator(cfg: DictConfig) -> TrainingOrchestrator:
     """Create training orchestrator from configuration."""
     return TrainingOrchestrator(cfg)
