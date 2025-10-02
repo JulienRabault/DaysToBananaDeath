@@ -8,7 +8,7 @@ freeze_backbone: false
 dropout_rate: 0.3
 
 # Training parameters
-num_classes: 4
+num_classes: 5  # Updated from 4 to 5 to include 'unknowns' class
 learning_rate: 1e-3
 weight_decay: 1e-4
 scheduler: "cosine"  # cosine, step, plateau, none

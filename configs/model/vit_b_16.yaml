@@ -5,11 +5,11 @@ _target_: src.model.VisionTransformerClassifier
 model_name: "vit_b_16"
 pretrained: true
 freeze_backbone: false
-dropout_rate: 0.1
+dropout_rate: 0.3
 
 # Training parameters
-num_classes: 4
-learning_rate: 5e-4
+num_classes: 5
+learning_rate: 5e-3
 weight_decay: 1e-4
 scheduler: "cosine"
 

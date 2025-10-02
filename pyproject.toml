@@ -26,7 +26,8 @@ dependencies = [
     "prometheus-client>=0.23.1",
     "pyyaml>=6.0.3",
     "python-multipart>=0.0.20",
-    "ultralytics>=8.0.0",  # Pour YOLO
+    "ultralytics>=8.0.0", # Pour YOLO
+    "pillow-heif>=1.1.1",
 ]
 [[tool.uv.index]]
 name = "pytorch-cu128"

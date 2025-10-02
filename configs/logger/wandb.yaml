@@ -2,7 +2,7 @@
 _target_: lightning.pytorch.loggers.WandbLogger
 
 # Project settings
-project: "banana-classification"
+project: "banana-classification-unknown"  # Nom du projet W&B
 name: null  # Sera défini automatiquement par trainer_helper
 save_dir: null  # Sera défini automatiquement par trainer_helper
 

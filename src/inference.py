@@ -54,7 +54,7 @@ class BananaClassifierInference:
         self.device = self._setup_device(device)
 
         # Class names (consistent with training)
-        self.class_names = ['overripe', 'ripe', 'rotten', 'unripe']
+        self.class_names = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']
         self.num_classes = len(self.class_names)
 
         # Load configuration if provided

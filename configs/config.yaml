@@ -8,12 +8,9 @@ defaults:
   - experiment: null
   - _self_
 
-# Random seed for reproducibility
-seed: 42
-
 # Experiment metadata (ML naming conventions)
 experiment:
-  name: "banana-ripeness-classifier"  # Base experiment name
+  name: "banana-ripeness-classifier-unknowns"  # Base experiment name
   version: null  # Will auto-generate: v2025.10.01
   tag: null      # Optional: "baseline", "improved", etc.
   notes: "Banana ripeness classification using deep learning"

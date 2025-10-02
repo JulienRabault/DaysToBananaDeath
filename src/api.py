@@ -19,10 +19,11 @@ logger.setLevel(logging.WARNING)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 # Variables globales
 model_session = None
 transform = None
-classes = ["overripe", "ripe", "rotten", "unripe"]
+classes = ["overripe", "ripe", "rotten", "unripe", "unknowns"]
 temp_dir = None  # Pour garder une référence au répertoire temporaire
 
 def download_model_from_wandb():
@@ -32,23 +33,21 @@ def download_model_from_wandb():
     try:
         logger.info("Téléchargement du modèle depuis W&B...")
 
-        # Connexion à W&B (mode anonyme pour éviter les problèmes d'auth)
-        wandb.login(anonymous="allow")
+        wandb.login()
 
         # Créer un répertoire temporaire qui persiste pendant la vie de l'application
         temp_dir = tempfile.TemporaryDirectory(prefix="wandb_artifacts_")
         logger.info(f"Répertoire temporaire créé: {temp_dir.name}")
 
-        # Téléchargement de l'artifact dans le répertoire temporaire
-        run = wandb.init()
-        # artifact = run.use_artifact('jrabault/banana-classification/onnx:v2', type='model')
-        artifact = run.use_artifact('jrabault/banana-classification/onnx:v1', type='model')
+        api = wandb.Api()
+        artifact = api.artifact('jrabault/banana-classification-unknown/onnx:v0', type='model')
         artifact_dir = artifact.download(root=temp_dir.name)
+
         print(f"Artifact téléchargé dans: {artifact_dir}")
 
         # Trouver dynamiquement le fichier ONNX
         onnx_files = list(Path(artifact_dir).glob("*.onnx"))
-
+        # onnx_files = ["/mnt/data/WORK/DaysToBananaDeath/outputs/banana-ripeness-classifier-unknowns/v2025.10.02/resnet50_lr1e-03_bs32_ep15_1759398575_909AXV/artifacts/model.onnx"]
         if not onnx_files:
             logger.error(f"Aucun fichier ONNX trouvé dans {artifact_dir}")
             return None
@@ -113,12 +112,6 @@ async def lifespan(app: FastAPI):
         temp_dir.cleanup()
         logger.info("Répertoire temporaire supprimé")
 
-# Application FastAPI simple
-app = FastAPI(
-    title="Banana Classifier",
-    description="API simple pour classifier les bananes",
-    lifespan=lifespan
-)
 
 def preprocess_image(image: Image.Image) -> np.ndarray:
     """Préparation de l'image pour le modèle."""
@@ -136,6 +129,12 @@ def preprocess_image(image: Image.Image) -> np.ndarray:
     image_batch = np.expand_dims(image_tensor, axis=0)
 
     return image_batch
+
+app = FastAPI(
+    title="Banana Classifier",
+    description="API simple pour classifier les bananes",
+    lifespan=lifespan
+)
 
 @app.get("/")
 async def home():
@@ -207,3 +206,11 @@ async def predict(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Erreur prédiction: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+import os
+
+
+if __name__ == '__main__':
+    import uvicorn
+    port = int(os.environ.get('PORT', 8000))
+    uvicorn.run(app, host='0.0.0.0', port=port)

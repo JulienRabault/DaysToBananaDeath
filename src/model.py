@@ -9,8 +9,6 @@ import lightning as L
 import torchvision.models as models
 import torchmetrics
 from typing import Optional
-import ultralytics
-from ultralytics import YOLO
 import torchvision.transforms as transforms
 
 
@@ -19,7 +17,7 @@ class BaseBananaClassifier(L.LightningModule):
 
     def __init__(
         self,
-        num_classes: int = 4,
+        num_classes: int = 5,  # Updated from 4 to 5 classes
         learning_rate: float = 1e-3,
         weight_decay: float = 1e-4,
         scheduler: str = "cosine",  # "cosine", "step", "plateau", "none"
@@ -33,7 +31,7 @@ class BaseBananaClassifier(L.LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.scheduler = scheduler
-        self.class_names = ['overripe', 'ripe', 'rotten', 'unripe']
+        self.class_names = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']  # Added 'unknowns' class
 
         # Metrics collections
         self.train_metrics = torchmetrics.MetricCollection(
@@ -287,169 +285,3 @@ class VisionTransformerClassifier(BaseBananaClassifier):
     def forward(self, x):
         features = self.backbone(x)
         return self.classifier(features)
-
-
-class YOLOClassifier(BaseBananaClassifier):
-    """YOLO-based classifier for banana ripeness detection and classification."""
-
-    def __init__(
-        self,
-        model_name: str = "yolov8n",
-        pretrained: bool = True,
-        confidence_threshold: float = 0.5,
-        **kwargs
-    ):
-        super().__init__(**kwargs)
-        self.save_hyperparameters()
-
-        self.model_name = model_name
-        self.pretrained = pretrained
-        self.confidence_threshold = confidence_threshold
-
-        # Initialize YOLO model for detection
-        if pretrained:
-            self.yolo_detector = YOLO(f'{model_name}.pt')
-        else:
-            self.yolo_detector = YOLO(f'{model_name}.yaml')
-
-        # Custom classification head for ripeness classification
-        # YOLO feature dimension depends on model size
-        feature_dims = {
-            'yolov8n': 512,
-            'yolov8s': 512,
-            'yolov8m': 768,
-            'yolov8l': 1024,
-            'yolov8x': 1280
-        }
-        backbone_dim = feature_dims.get(model_name, 512)
-
-        self.classifier = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Dropout(0.3),
-            nn.Linear(backbone_dim, 256),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(128, self.num_classes)
-        )
-
-        # Transform to convert PIL images to tensor for YOLO
-        self.transform = transforms.Compose([
-            transforms.ToPILImage(),
-        ])
-
-    def extract_features_from_detection(self, image, detection_box):
-        """Extract features from the detected bounding box region."""
-        if detection_box is None:
-            # If no detection, use the whole image
-            crop = image
-        else:
-            # Crop the image using the detection box
-            x1, y1, x2, y2 = detection_box
-            crop = image[:, :, int(y1):int(y2), int(x1):int(x2)]
-
-        # Resize crop to standard size for feature extraction
-        crop_resized = torch.nn.functional.interpolate(crop, size=(224, 224), mode='bilinear', align_corners=False)
-
-        # Use YOLO backbone to extract features
-        with torch.no_grad():
-            # Get intermediate features from YOLO model
-            features = self.yolo_detector.model.model[:9](crop_resized)  # Use first 9 layers for feature extraction
-
-        return features
-
-    def forward(self, x):
-        """Forward pass using YOLO detection + classification."""
-        batch_size = x.shape[0]
-        batch_logits = []
-
-        for i in range(batch_size):
-            single_image = x[i:i+1]
-
-            # Convert tensor to PIL for YOLO detection
-            image_pil = transforms.ToPILImage()(single_image.squeeze(0))
-
-            # Run YOLO detection
-            with torch.no_grad():
-                results = self.yolo_detector(image_pil, verbose=False)
-
-            # Get the first detection above confidence threshold
-            detection_box = None
-            if len(results) > 0 and len(results[0].boxes) > 0:
-                boxes = results[0].boxes
-                confidences = boxes.conf.cpu().numpy()
-
-                # Find first detection above threshold
-                valid_detections = confidences >= self.confidence_threshold
-                if valid_detections.any():
-                    first_valid_idx = valid_detections.argmax()
-                    detection_box = boxes.xyxy[first_valid_idx].cpu().numpy()
-
-            # Extract features from detection region
-            features = self.extract_features_from_detection(single_image, detection_box)
-
-            # Classify the detected region
-            logits = self.classifier(features)
-            batch_logits.append(logits)
-
-        # Stack all logits from the batch
-        return torch.cat(batch_logits, dim=0)
-
-    def predict_step(self, batch, batch_idx):
-        """Prediction step for inference with detection information."""
-        x, _ = batch if isinstance(batch, tuple) else (batch, None)
-
-        # Get detections and classifications
-        detections_info = []
-        batch_logits = []
-
-        for i in range(x.shape[0]):
-            single_image = x[i:i+1]
-
-            # Convert tensor to PIL for YOLO detection
-            image_pil = transforms.ToPILImage()(single_image.squeeze(0))
-
-            # Run YOLO detection
-            with torch.no_grad():
-                results = self.yolo_detector(image_pil, verbose=False)
-
-            # Get the first detection above confidence threshold
-            detection_info = {"has_detection": False, "box": None, "confidence": 0.0}
-            detection_box = None
-
-            if len(results) > 0 and len(results[0].boxes) > 0:
-                boxes = results[0].boxes
-                confidences = boxes.conf.cpu().numpy()
-
-                # Find first detection above threshold
-                valid_detections = confidences >= self.confidence_threshold
-                if valid_detections.any():
-                    first_valid_idx = valid_detections.argmax()
-                    detection_box = boxes.xyxy[first_valid_idx].cpu().numpy()
-                    detection_info = {
-                        "has_detection": True,
-                        "box": detection_box.tolist(),
-                        "confidence": float(confidences[first_valid_idx])
-                    }
-
-            detections_info.append(detection_info)
-
-            # Extract features and classify
-            features = self.extract_features_from_detection(single_image, detection_box)
-            logits = self.classifier(features)
-            batch_logits.append(logits)
-
-        # Stack all logits
-        logits = torch.cat(batch_logits, dim=0)
-        preds = torch.argmax(logits, dim=1)
-        probs = torch.softmax(logits, dim=1)
-
-        return {
-            "predictions": preds,
-            "probabilities": probs,
-            "logits": logits,
-            "detections": detections_info
-        }
