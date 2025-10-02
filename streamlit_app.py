@@ -18,9 +18,9 @@ CLASSES = ["overripe", "ripe", "rotten", "unripe", "unknowns"]
 
 # Base days per class
 CLASS_TO_DAYS = {
-    "unripe": 5.0,
-    "ripe": 2.0,
-    "overripe": 0.5,
+    "unripe": 6.0,
+    "ripe": 4.0,
+    "overripe": 1.5,
     "rotten": 0.0,
     "unknowns": 2.0,
 }
@@ -107,7 +107,7 @@ def expected_days_from_probs(probs: np.ndarray) -> float:
     top_idx = int(np.argmax(probs))
     top_class = CLASSES[top_idx]
     if top_class in ["unripe", "ripe", "overripe"]:
-        expected += random.uniform(-1.0, 1.0)
+        expected += random.uniform(-0.5, 0.5)
     # Clamp between 0 and 7 days for safety
     return max(0.0, min(7.0, expected))
 
