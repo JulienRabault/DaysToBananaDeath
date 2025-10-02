@@ -118,9 +118,27 @@ def predict_days(image: Image.Image, session: ort.InferenceSession, transform: A
     outputs = session.run(None, {input_name: batch})
     logits = outputs[0][0]
     probs = softmax(logits)
-    days = expected_days_from_probs(probs)
+
+    # Get predicted class
+    top_idx = int(np.argmax(probs))
+    predicted_class = CLASSES[top_idx]
     confidence = float(np.max(probs))
-    return {"days_left": days, "confidence": confidence}
+
+    # Special handling for unknowns
+    if predicted_class == "unknowns":
+        return {
+            "is_banana": False,
+            "confidence": confidence,
+            "predicted_class": predicted_class
+        }
+
+    days = expected_days_from_probs(probs)
+    return {
+        "is_banana": True,
+        "days_left": days,
+        "confidence": confidence,
+        "predicted_class": predicted_class
+    }
 
 
 # ------------- UI -------------
@@ -129,6 +147,27 @@ st.set_page_config(page_title="DayToBananaDeath", page_icon="🍌", layout="cent
 st.title("🍌 Day to banana death")
 st.caption("Estimate how many days remain before your banana is no longer edible")
 
+# Explanation note
+with st.expander("ℹ️ About this project"):
+    st.markdown("""
+    **Why this application?**
+    
+    This demo showcases a complete **MLOps pipeline** built as a learning exercise to master modern ML engineering practices:
+    
+    - **Hydra** for configuration management
+    - **Weights & Biases** for experiment tracking and model versioning
+    - **FastAPI** for REST API development
+    - **ONNX Runtime** for optimized model deployment
+    - **Streamlit** for interactive web interfaces
+    
+    The banana ripeness classification model demonstrates end-to-end ML deployment from training to production, 
+    with proper experiment tracking, model versioning, and scalable inference infrastructure.
+    
+    *GitHub repository: [BananaCheck MLOps Project](https://github.com/your-username/DaysToBananaDeath)*
+    *Author: Julien Rabault julienrabault@icloud.com
+    """)
+
+
 state = load_model_session()
 
 uploaded = st.file_uploader("Upload a banana image", type=["jpg", "jpeg", "png", "webp", "bmp"])
@@ -136,37 +175,42 @@ use_camera = st.toggle("Use camera (experimental)", value=False)
 camera_image = st.camera_input("Take a photo") if use_camera else None
 img_file = camera_image or uploaded
 
-if img_file is not None:
-    image = Image.open(img_file)
-    st.image(image, caption="Uploaded image", use_container_width=True)
-    if state.get("session") is None:
-        st.warning("Model not available. Check configuration.")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("Image")
+    if img_file is not None:
+        image = Image.open(img_file)
+        st.image(image, caption="Uploaded image", use_container_width=True)
     else:
-        with st.spinner("Predicting..."):
-            try:
-                res = predict_days(image, state["session"], state["transform"])
-                days_left = res["days_left"]
-                conf = res["confidence"]
+        st.info("Upload an image or use the camera to start.")
 
-                rounded = max(0.0, round(days_left * 2) / 2.0)
-                label = "day" if abs(rounded - 1.0) < 1e-6 else "days"
-                st.metric("Estimated remaining days", f"~ {rounded} {label}")
-                st.caption(f"Confidence: {conf*100:.0f}%")
-            except Exception as e:
-                st.error(f"Inference error: {e}")
-else:
-    st.info("Upload an image or use the camera to start.")
+with col2:
+    st.subheader("Prediction")
+    if img_file is not None:
+        if state.get("session") is None:
+            st.warning("Model not available. Check configuration.")
+        else:
+            with st.spinner("Analyzing..."):
+                try:
+                    res = predict_days(image, state["session"], state["transform"])
+                    conf = res["confidence"]
 
-st.divider()
+                    if not res["is_banana"]:
+                        # Not a banana case
+                        st.markdown("### 🤔")
+                        st.markdown("## **Is this even a banana?**")
+                        st.caption(f"Confidence: {conf*100:.0f}%")
+                    else:
+                        # Normal banana prediction
+                        days_left = res["days_left"]
+                        rounded = max(0.0, round(days_left * 2) / 2.0)
+                        label = "day" if abs(rounded - 1.0) < 1e-6 else "days"
 
-if __name__ == "__main__":
-    import webbrowser
-    import subprocess
+                        st.markdown("### 📅")
+                        st.markdown("## **Estimated remaining days**")
+                        st.markdown(f"# **~ {rounded} {label}**")
+                        st.caption(f"Confidence: {conf*100:.0f}%")
 
-    port = int(os.environ.get("PORT", 8501))
-    url = f"http://localhost:{port}"
-    try:
-        webbrowser.open_new_tab(url)
-    except Exception:
-        pass
-    subprocess.run(["streamlit", "run", __file__, "--server.port", str(port), "--server.address", "0.0.0.0"])
+                except Exception as e:
+                    st.error(f"Inference error: {e}")

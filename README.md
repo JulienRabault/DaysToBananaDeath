@@ -1,8 +1,10 @@
-# 🍌 BananaCheck - MLOps Learning Project
+# BananaCheck - MLOps Learning Project
 
 A modern ML project showcasing **MLOps best practices** with banana ripeness classification.
 
-## 🎯 Project Goals
+**Live Demo:** https://daystobananadeath.streamlit.app/
+
+## Project Goals
 
 This project was built as a learning exercise to master key MLOps technologies:
 
@@ -12,7 +14,7 @@ This project was built as a learning exercise to master key MLOps technologies:
 - **Model Deployment** with ONNX Runtime
 - **Web Interface** with Streamlit
 
-## 🚀 Features
+## Features
 
 - **AI-powered banana ripeness estimation** (days remaining before spoilage)
 - **REST API** for programmatic access
@@ -20,7 +22,7 @@ This project was built as a learning exercise to master key MLOps technologies:
 - **Model versioning** and artifact management via W&B
 - **Production-ready deployment** with Docker support
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Core ML/MLOps
 - **PyTorch Lightning** - Training framework
@@ -37,14 +39,14 @@ This project was built as a learning exercise to master key MLOps technologies:
 - **Albumentations** - Image augmentation pipeline
 - **PIL/OpenCV** - Image processing
 
-## 📊 Model Performance
+## Model Performance
 
 - **Architecture**: ResNet50 & Vision Transformer (ViT-B/16)
 - **Dataset**: 20K+ banana images across 5 ripeness stages
 - **Classes**: unripe, ripe, overripe, rotten, unknowns
 - **Deployment**: ONNX optimized for CPU inference
 
-## 🔧 Quick Start
+## Quick Start
 
 ### API Usage
 ```bash
@@ -73,7 +75,7 @@ pip install -r requirements.txt
 export WANDB_API_KEY=your_api_key
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ├── src/
@@ -87,7 +89,7 @@ export WANDB_API_KEY=your_api_key
 └── Procfile               # Deployment configuration
 ```
 
-## 🧠 Key Learning Outcomes
+## Key Learning Outcomes
 
 ### Hydra Configuration Management
 - Structured config files for different components (model, data, training)
@@ -106,13 +108,13 @@ export WANDB_API_KEY=your_api_key
 - Health checks and monitoring endpoints
 - ONNX optimization for fast inference
 
-## 📋 Dataset Sources
+## Dataset Sources
 
 Built using established vision datasets:
 - [BananaRipeness Dataset](https://github.com/luischuquim/BananaRipeness/) by Chuquimarca et al.
 - Additional synthetic and augmented data
 
-## 🚢 Deployment
+## Deployment
 
 The project includes production-ready deployment configurations:
 - **Heroku/Railway**: via Procfile
@@ -121,4 +123,4 @@ The project includes production-ready deployment configurations:
 
 ---
 
-*Built to explore modern MLOps practices and deployment strategies**
+*Built to explore modern MLOps practices and deployment strategies*
