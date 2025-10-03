@@ -9,3 +9,4 @@ wandb==0.19.2
 python-dotenv==1.0.1
 streamlit
 torch
+boto3==1.35.57
