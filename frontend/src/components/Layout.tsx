@@ -30,7 +30,7 @@ export const Layout = ({ children }: LayoutProps) => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900">
       <header className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
@@ -69,11 +69,11 @@ export const Layout = ({ children }: LayoutProps) => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto flex-1 max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {children}
       </main>
 
-      <footer className="mt-auto border-t border-gray-200 bg-white py-6 dark:border-gray-700 dark:bg-gray-800">
+      <footer className="border-t border-gray-200 bg-white py-6 dark:border-gray-700 dark:bg-gray-800">
         <div className="mx-auto max-w-7xl px-4 text-center text-sm text-gray-500 dark:text-gray-400">
           Banana Prediction App - Prédiction et correction d&apos;images
         </div>

@@ -15,7 +15,7 @@ export const health = async (signal?: AbortSignal): Promise<HealthResponse> => {
 };
 
 export const predictImage = async (file: File, signal?: AbortSignal): Promise<PredictResponse> => {
-  const { endpoints, responseMapping } = useSettings.getState();
+  const { endpoints } = useSettings.getState();
 
   const formData = new FormData();
   formData.append('file', file);
@@ -29,12 +29,15 @@ export const predictImage = async (file: File, signal?: AbortSignal): Promise<Pr
   const clientLatency = Date.now() - startTime;
 
   const mappedResponse: PredictResponse = {
-    predictions: (response[responseMapping.predictions] as PredictResponse['predictions']) || [],
-    predicted_label: String(response[responseMapping.predicted_label] || ''),
-    predicted_index: Number(response[responseMapping.predicted_index] || 0),
-    confidence: Number(response[responseMapping.confidence] || 0),
-    image_key: String(response[responseMapping.image_key] || ''),
-    latency_ms: Number(response[responseMapping.latency_ms] || clientLatency),
+    predictions: Object.entries(response.class_probabilities || {}).map(([label, confidence]) => ({
+      label,
+      confidence: Number(confidence)
+    })).sort((a, b) => b.confidence - a.confidence),
+    predicted_label: String(response.predicted_class || ''),
+    predicted_index: Number(response.predicted_index || 0),
+    confidence: Number(response.confidence || 0),
+    image_key: String(response.image_key || ''),
+    latency_ms: Number(response.latency_ms || clientLatency),
     // Include temp_file_data if present in response
     temp_file_data: response.temp_file_data as PredictResponse['temp_file_data'],
   };
