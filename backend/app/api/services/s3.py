@@ -1,3 +1,5 @@
+"""Service for S3 operations including uploads, downloads, and presigned URLs."""
+
 import os
 import json
 import tempfile
@@ -5,22 +7,23 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 try:
-    import boto3  # type: ignore
-    from botocore.client import Config  # type: ignore
-except Exception:  # pragma: no cover - handled at runtime
-    boto3 = None  # type: ignore
-    Config = None  # type: ignore
+    import boto3
+    from botocore.client import Config
+except Exception:
+    boto3 = None
+    Config = None
 
 from ...config import config
 
 
 class S3Service:
-    def __init__(self):
+    """Service for S3 operations including uploads, downloads, and presigned URLs."""
+
+    def __init__(self) -> None:
         if boto3 is None:
             raise RuntimeError("boto3 is required for S3 operations. Install it via backend/requirements.txt")
 
-        # Use config instead of os.getenv
-        self.bucket = config.S3_BUCKET_NAME or os.getenv("S3_BUCKET")  # Backward compatibility
+        self.bucket = config.S3_BUCKET_NAME or os.getenv("S3_BUCKET")
         region = config.AWS_REGION
         endpoint_url = config.S3_ENDPOINT_URL
 
@@ -35,6 +38,7 @@ class S3Service:
         self.s3 = session.client("s3", endpoint_url=endpoint_url, config=Config(signature_version="s3v4"))
 
     def generate_presigned_post(self, key: str, expires_in: int = 3600, content_type: Optional[str] = None) -> Dict[str, Any]:
+        """Generate presigned POST URL for file uploads."""
         conditions = []
         if content_type:
             conditions.append(["starts-with", "$Content-Type", content_type.split("/")[0]])
@@ -48,65 +52,79 @@ class S3Service:
         return resp
 
     def generate_presigned_put(self, key: str, expires_in: int = 3600, content_type: Optional[str] = None) -> str:
+        """Generate presigned PUT URL for file uploads."""
         params = {"Bucket": self.bucket, "Key": key}
         if content_type:
             params["ContentType"] = content_type
-        url = self.s3.generate_presigned_url("put_object", Params=params, ExpiresIn=expires_in)
-        return url
+        return self.s3.generate_presigned_url("put_object", Params=params, ExpiresIn=expires_in)
 
-    def upload_fileobj(self, file_obj, key: str, content_type: Optional[str] = None) -> str:
-        extra_args = {"ContentType": content_type} if content_type else None
-        self.s3.upload_fileobj(file_obj, self.bucket, key, ExtraArgs=extra_args or {})
-        return key
-
-    def download_to_tempfile(self, key: str) -> str:
-        tmp = tempfile.NamedTemporaryFile(delete=False)
-        self.s3.download_fileobj(self.bucket, key, tmp)
-        tmp.flush()
-        tmp.close()
-        return tmp.name
+    def upload_fileobj(self, fileobj: Any, key: str, content_type: Optional[str] = None) -> None:
+        """Upload file object to S3."""
+        extra_args = {}
+        if content_type:
+            extra_args["ContentType"] = content_type
+        self.s3.upload_fileobj(fileobj, self.bucket, key, ExtraArgs=extra_args)
 
     def download_fileobj(self, key: str) -> bytes:
-        """Download file content directly to memory as bytes"""
+        """Download file from S3 as bytes."""
         import io
-        buffer = io.BytesIO()
-        self.s3.download_fileobj(self.bucket, key, buffer)
-        buffer.seek(0)
-        return buffer.getvalue()
+        buf = io.BytesIO()
+        self.s3.download_fileobj(self.bucket, key, buf)
+        return buf.getvalue()
+
+    def download_to_tempfile(self, key: str) -> str:
+        """Download file from S3 to temporary file and return path."""
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp.close()
+        self.s3.download_file(self.bucket, key, tmp.name)
+        return tmp.name
 
     def copy_object(self, source_key: str, dest_key: str) -> None:
+        """Copy object within S3 bucket."""
         copy_source = {"Bucket": self.bucket, "Key": source_key}
-        self.s3.copy(copy_source, self.bucket, dest_key)
+        self.s3.copy_object(CopySource=copy_source, Bucket=self.bucket, Key=dest_key)
 
     def put_json(self, key: str, data: Dict[str, Any]) -> None:
-        body = json.dumps(data).encode("utf-8")
-        self.s3.put_object(Bucket=self.bucket, Key=key, Body=body, ContentType="application/json")
+        """Upload JSON data to S3."""
+        self.s3.put_object(
+            Bucket=self.bucket,
+            Key=key,
+            Body=json.dumps(data, default=str),
+            ContentType="application/json"
+        )
 
     def get_json(self, key: str) -> Optional[Dict[str, Any]]:
+        """Download and parse JSON from S3."""
         try:
-            obj = self.s3.get_object(Bucket=self.bucket, Key=key)
-            data = obj["Body"].read()
-            return json.loads(data)
-        except Exception:
-            # Return None if not found or any other non-critical issue
+            response = self.s3.get_object(Bucket=self.bucket, Key=key)
+            return json.loads(response["Body"].read())
+        except self.s3.exceptions.NoSuchKey:
             return None
 
     def increment_counter(self, key: str) -> int:
-        data = self.get_json(key) or {"count": 0, "updated_at": None}
-        data["count"] = int(data.get("count", 0)) + 1
-        data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        self.put_json(key, data)
-        return int(data["count"])  # assure int
+        """Atomically increment counter stored in S3."""
+        try:
+            data = self.get_json(key) or {"count": 0}
+            count = int(data.get("count", 0)) + 1
+            data["count"] = count
+            data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self.put_json(key, data)
+            return count
+        except Exception:
+            self.put_json(key, {"count": 1, "updated_at": datetime.now(timezone.utc).isoformat()})
+            return 1
 
     def ensure_prefix(self, prefix: str) -> str:
-        return prefix.rstrip("/") + "/"
+        """Ensure prefix ends with '/' for S3 key structure."""
+        return prefix if prefix.endswith("/") else f"{prefix}/"
 
 
-# Lazy singleton
-_s3_service: Optional[S3Service] = None
+_s3_singleton: Optional[S3Service] = None
+
 
 def get_s3() -> S3Service:
-    global _s3_service
-    if _s3_service is None:
-        _s3_service = S3Service()
-    return _s3_service
+    """Get the global S3 service instance."""
+    global _s3_singleton
+    if _s3_singleton is None:
+        _s3_singleton = S3Service()
+    return _s3_singleton

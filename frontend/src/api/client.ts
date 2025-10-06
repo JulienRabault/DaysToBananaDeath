@@ -1,5 +1,5 @@
 import { ApiError } from '../types';
-import { API_CONFIG } from '../config/api';
+import { API_CONFIG, API_BASE_URL } from '../config/api';
 
 class ApiClient {
   private async fetchWithTimeout(
@@ -41,11 +41,14 @@ class ApiClient {
   }
 
   async request<T>(
-    url: string,
+    endpoint: string,
     options: RequestInit = {},
     retries = API_CONFIG.MAX_RETRIES,
     signal?: AbortSignal
   ): Promise<T> {
+    // Construire l'URL complète
+    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+
     const startTime = Date.now();
     console.log(`[API] DÉBUT ${options.method || 'GET'} ${url}`);
 

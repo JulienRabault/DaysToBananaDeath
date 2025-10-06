@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "start": "serve -s dist -l $PORT",
     "preview": "vite preview",
     "test": "vitest",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -17,7 +18,8 @@
     "react-router-dom": "^6.22.0",
     "react-dropzone": "^14.2.3",
     "zustand": "^4.5.0",
-    "clsx": "^2.1.0"
+    "clsx": "^2.1.0",
+    "serve": "^14.2.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.1",

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 import os
@@ -13,6 +13,8 @@ from PIL import Image
 
 from ..services.s3 import get_s3
 from ..services.predictor import get_predictor
+from ..services.rate_limiter import limiter, CORRECTION_LIMIT
+from ..services.recaptcha import verify_recaptcha_token, RecaptchaError, is_recaptcha_enabled
 from ...config import config
 
 router = APIRouter(prefix="/corrections", tags=["corrections"])
@@ -22,32 +24,32 @@ CLASS_NAMES = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']
 
 def optimize_image_for_training(image_bytes: bytes, original_filename: str = "image") -> tuple[bytes, str]:
     """
-    Convertit n'importe quelle image vers le format optimal pour l'entraînement.
+    Convert any image to optimal format for training.
 
     Args:
-        image_bytes: Données brutes de l'image
-        original_filename: Nom de fichier original pour préserver certaines infos
+        image_bytes: Raw image data
+        original_filename: Original filename to preserve some info
 
     Returns:
-        tuple: (image_bytes_optimized, new_filename)
+        tuple: (optimized_image_bytes, new_filename)
     """
     import logging
     logger = logging.getLogger(__name__)
 
     try:
-        # Ouvrir l'image avec PIL
+        # Open the image with PIL
         img = Image.open(io.BytesIO(image_bytes))
 
-        # Informations sur l'image originale
+        # Original image info
         original_format = img.format
         original_size = img.size
         original_mode = img.mode
 
         logger.info(f"[IMAGE_OPT] Original: {original_format} {original_size} {original_mode}")
 
-        # Convertir en RGB si nécessaire (pour supporter RGBA, P, etc.)
+        # Convert to RGB if necessary (to support RGBA, P, etc.)
         if img.mode in ('RGBA', 'LA', 'P'):
-            # Créer un fond blanc pour les images avec transparence
+            # Create a white background for images with transparency
             background = Image.new('RGB', img.size, (255, 255, 255))
             if img.mode == 'P':
                 img = img.convert('RGBA')
@@ -56,33 +58,33 @@ def optimize_image_for_training(image_bytes: bytes, original_filename: str = "im
         elif img.mode != 'RGB':
             img = img.convert('RGB')
 
-        # Redimensionner si l'image est trop grande (optimisation pour l'entraînement)
-        max_size = 512  # Taille max recommandée pour l'entraînement
+        # Resize if the image is too large (training optimization)
+        max_size = 512  # Recommended max size for training
         if max(img.size) > max_size:
             img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
             logger.info(f"[IMAGE_OPT] Resized to: {img.size}")
 
-        # Sauvegarder en JPEG optimisé
+        # Save as optimized JPEG
         output_buffer = io.BytesIO()
 
-        # Qualité optimale pour l'entraînement : 90%
-        # - Assez haute pour préserver les détails importants
-        # - Assez compressée pour réduire la taille de stockage
+        # Optimal quality for training: 90%
+        # - High enough to preserve important details
+        # - Compressed enough to reduce storage size
         img.save(
             output_buffer,
             format='JPEG',
             quality=90,
             optimize=True,
-            progressive=True  # JPEG progressif pour de meilleures performances
+            progressive=True  # Progressive JPEG for better performance
         )
 
         optimized_bytes = output_buffer.getvalue()
 
-        # Générer nouveau nom de fichier
+        # Generate new filename
         base_name = os.path.splitext(original_filename)[0]
         new_filename = f"{base_name}_optimized.jpg"
 
-        # Statistiques de compression
+        # Compression statistics
         original_size_bytes = len(image_bytes)
         optimized_size_bytes = len(optimized_bytes)
         compression_ratio = (1 - optimized_size_bytes / original_size_bytes) * 100
@@ -95,32 +97,52 @@ def optimize_image_for_training(image_bytes: bytes, original_filename: str = "im
 
     except Exception as e:
         logger.error(f"[IMAGE_OPT] Failed to optimize image: {str(e)}")
-        # En cas d'erreur, retourner l'image originale
+        # In case of error, return the original image
         return image_bytes, original_filename
 
 
 class CorrectionRequest(BaseModel):
+    """Request model for image correction submissions."""
     image_key: str = Field(..., description="S3 key or temporary ID of the uploaded image")
-    # For temporary images (from predictions), include the file data
     temp_file_data: Optional[Dict[str, str]] = Field(None, description="Temporary file data for images not yet uploaded to S3")
-
-    # Option 1: user directly provides the class
+    recaptcha_token: Optional[str] = Field(None, description="reCAPTCHA v3 token for bot protection")
     corrected_label: Optional[str] = Field(None, description="Corrected label among supported classes")
-    # Option 2: user says if it's a banana and number of days left
     is_banana: Optional[bool] = Field(None, description="True if it's a banana, False otherwise")
     days_left: Optional[float] = Field(None, description="Number of days left if it's a banana")
-
-    # prediction info for audit/UX
     predicted_label: Optional[str] = None
     predicted_index: Optional[int] = None
     confidence: Optional[float] = None
-
-    metadata: Optional[Dict[str, Any]] = None  # free: userId, sessionId, etc.
+    metadata: Optional[Dict[str, Any]] = None
 
 
 @router.post("")
-async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
+@limiter.limit(CORRECTION_LIMIT)
+async def submit_correction(request: Request, body: CorrectionRequest) -> Dict[str, Any]:
+    """Submit a correction for a predicted image."""
     import logging
+
+    # Check if corrections are enabled
+    if not config.ENABLE_CORRECTIONS:
+        logging.warning("[CORRECTION] Corrections are disabled via ENABLE_CORRECTIONS=false")
+        raise HTTPException(
+            status_code=503,
+            detail="Correction service is temporarily disabled"
+        )
+
+    # reCAPTCHA verification for corrections
+    if is_recaptcha_enabled():
+        if not body.recaptcha_token:
+            raise HTTPException(
+                status_code=400,
+                detail="reCAPTCHA token required to submit correction"
+            )
+
+        try:
+            recaptcha_result = await verify_recaptcha_token(body.recaptcha_token, "correction")
+            logging.info(f"[CORRECTION] reCAPTCHA verified: score={recaptcha_result.get('score', 'N/A')}")
+        except RecaptchaError as e:
+            logging.warning(f"[CORRECTION] reCAPTCHA verification failed: {str(e)}")
+            raise HTTPException(status_code=403, detail=f"Bot verification failed: {str(e)}")
 
     # Enhanced logging for debugging
     logging.info(f"[CORRECTION] === DEBUGGING CORRECTION REQUEST ===")
@@ -155,6 +177,7 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
 
             final_label = predictor.get_class_from_days_left(float(body.days_left))
 
+            # Optional: validate the correction
             if body.corrected_label:
                 validation_info = predictor.validate_correction(float(body.days_left), body.corrected_label)
 
@@ -167,7 +190,7 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
     counter_key = config.CORRECTION_COUNTER_KEY
     threshold = config.CORRECTION_THRESHOLD
 
-    # générer un id et une destination structurée
+    # Generate a new ID and structured destination
     cid = uuid.uuid4().hex
 
     try:
@@ -250,7 +273,7 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
                 s3.copy_object(source_key=source_key, dest_key=dest_key)
                 logging.info(f"[CORRECTION] Fallback: S3 image copied from {source_key} to {dest_key}")
 
-        # record JSON
+        # Record JSON
         record = {
             "id": cid,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -269,11 +292,11 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
         record_key = posixpath.join(corrections_prefix, "records", f"{cid}.json")
         s3.put_json(record_key, record)
 
-        # incrément compteur
+        # Increment counter
         count = s3.increment_counter(counter_key)
         threshold_reached = count >= threshold
 
-        # Optionnel: webhook d'alerte
+        # Optional: alert webhook
         if threshold_reached:
             webhook = config.ALERT_WEBHOOK_URL
             if webhook:
@@ -289,7 +312,7 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
                     req = _urlreq.Request(webhook, data=_json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json"})
                     _urlreq.urlopen(req, timeout=5)
                 except Exception:
-                    # Ne bloque pas la réponse si l'alerte échoue
+                    # Don't block the response if the alert fails
                     pass
 
         return {
@@ -308,6 +331,14 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
 
 @router.get("/stats")
 async def corrections_stats() -> Dict[str, Any]:
+    """Get correction statistics."""
+    # Check if corrections are enabled
+    if not config.ENABLE_CORRECTIONS:
+        raise HTTPException(
+            status_code=503,
+            detail="Correction service is temporarily disabled"
+        )
+
     s3 = get_s3()
     counter_key = config.CORRECTION_COUNTER_KEY
     data = s3.get_json(counter_key) or {"count": 0}

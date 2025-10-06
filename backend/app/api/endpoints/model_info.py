@@ -61,6 +61,7 @@ async def get_model_info() -> Dict[str, Any]:
             },
             "configuration": {
                 "mockPredictions": config.ENABLE_MOCK_PREDICTIONS,
+                "correctionsEnabled": config.ENABLE_CORRECTIONS,
                 "logLevel": config.LOG_LEVEL,
                 "s3Bucket": config.S3_BUCKET_NAME,
                 "awsRegion": config.AWS_REGION

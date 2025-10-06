@@ -1,3 +1,5 @@
+"""Service for banana ripeness prediction using ML models."""
+
 import io
 import os
 import random
@@ -11,21 +13,17 @@ from typing import Any, Dict, Optional
 import numpy as np
 from PIL import Image
 
-# Import centralized configuration
 from ...config import config
 
-# Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configure logging level from config
 logger.setLevel(getattr(logging, config.LOG_LEVEL, logging.INFO))
 
-# Check if debug mode is enabled (based on LOG_LEVEL)
 DEBUG_MODE = config.LOG_LEVEL == "DEBUG"
 
 try:
-    import onnxruntime as ort  # optional
+    import onnxruntime as ort
 except Exception:
     ort = None
 
@@ -61,7 +59,6 @@ def map_days_left_to_class(days_left: float) -> str:
     """Maps remaining days to banana ripeness class based on thresholds."""
     thresholds = get_days_to_class_thresholds()
 
-    # Convert to int for comparison
     days = int(round(days_left))
 
     if days >= thresholds["unripe_min"]:
@@ -73,28 +70,26 @@ def map_days_left_to_class(days_left: float) -> str:
     elif days == 0:
         return "rotten"
     else:
-        # Fallback for edge cases
         return "unknowns"
 
 
 class PredictorService:
-    def __init__(self):
+    """Service for banana ripeness prediction using ML models."""
+
+    def __init__(self) -> None:
         logger.info("[PREDICTOR] Initializing PredictorService")
 
-        # Classes aligned with training
         self.class_names = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']
         self.img_size = config.MODEL_IMG_SIZE
         self.model_type = config.MODEL_TYPE
         self.device = config.INFERENCE_DEVICE
 
-        # Possible sources
         self.use_onnx = config.MODEL_FORMAT.lower() == "onnx"
         self.local_model_path = config.MODEL_LOCAL_PATH
         self.s3_model_key = config.MODEL_S3_KEY
         self.wandb_run_path = config.WANDB_RUN_PATH
         self.wandb_artifact = config.WANDB_ARTIFACT
 
-        # Mock predictions configuration
         self.enable_mock_predictions = config.ENABLE_MOCK_PREDICTIONS
 
         logger.info("[PREDICTOR] Configuration:")
@@ -111,11 +106,11 @@ class PredictorService:
 
         self._loaded = False
         self._onnx_session: Optional[Any] = None
-        self._pt_infer = None
+        self._pt_infer: Optional[Any] = None
         self._tempdir: Optional[str] = None
 
-    def _ensure_ml_path(self):
-        # Add ml/src to PYTHONPATH to import inference class
+    def _ensure_ml_path(self) -> None:
+        """Add ml/src to PYTHONPATH to import inference class."""
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../ml/src"))
         if repo_root not in sys.path:
             sys.path.append(repo_root)
@@ -123,33 +118,31 @@ class PredictorService:
                 logger.debug("[PREDICTOR] Added ml/src to Python path: %s", repo_root)
 
     def _download_model_from_s3_to(self, dest_path: str) -> str:
+        """Download model from S3 to specified path."""
         if not self.s3_model_key:
             raise RuntimeError("MODEL_S3_KEY is not set")
         logger.info("[PREDICTOR] Downloading model from S3 to: %s", dest_path)
         s3 = get_s3()
-        # Download file directly to dest_path
         s3.s3.download_file(Bucket=s3.bucket, Key=self.s3_model_key, Filename=dest_path)
         return dest_path
 
-    def _load_pytorch_inference(self):
+    def _load_pytorch_inference(self) -> None:
+        """Load PyTorch model for inference."""
         logger.info("[PREDICTOR] Loading PyTorch model...")
         start_time = time.time()
 
         self._ensure_ml_path()
-        from inference import BananaClassifierInference  # type: ignore
+        from inference import BananaClassifierInference
 
-        # Choose source
         checkpoint_path = None
         if self.local_model_path and self.local_model_path.endswith('.ckpt'):
             logger.info("[PREDICTOR] Using local model: %s", self.local_model_path)
             checkpoint_path = self.local_model_path
         elif self.s3_model_key and self.s3_model_key.endswith('.ckpt'):
             logger.info("[PREDICTOR] Downloading from S3: %s", self.s3_model_key)
-            # If we already downloaded to tempdir via prepare_startup, self.local_model_path will contain it
             if self.local_model_path and os.path.exists(self.local_model_path):
                 checkpoint_path = self.local_model_path
             else:
-                # fallback direct
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.ckpt')
                 tmp.close()
                 checkpoint_path = self._download_model_from_s3_to(tmp.name)
@@ -173,7 +166,8 @@ class PredictorService:
             logger.error("[PREDICTOR] No valid PyTorch model source found")
             raise RuntimeError("No valid model source provided for PyTorch (.ckpt). Set MODEL_LOCAL_PATH or MODEL_S3_KEY or WANDB_* env vars.")
 
-    def _load_onnx(self):
+    def _load_onnx(self) -> None:
+        """Load ONNX model for inference."""
         logger.info("[PREDICTOR] Loading ONNX model...")
         start_time = time.time()
 
@@ -208,7 +202,8 @@ class PredictorService:
         load_time = (time.time() - start_time) * 1000
         logger.info("[PREDICTOR] ONNX model loaded in %.2fms", load_time)
 
-    def load(self):
+    def load(self) -> None:
+        """Load the model if not already loaded."""
         if self._loaded:
             if DEBUG_MODE:
                 logger.debug("[PREDICTOR] Model already loaded, skipping")
@@ -219,25 +214,22 @@ class PredictorService:
             self._load_pytorch_inference()
         self._loaded = True
 
-    def prepare_startup(self):
+    def prepare_startup(self) -> None:
         """Creates temporary directory for model, downloads from S3 and forces reload."""
         if not self.s3_model_key:
             if DEBUG_MODE:
                 logger.debug("[PREDICTOR] No S3 key configured, skipping startup preparation")
-            return  # nothing to do if local model or W&B
+            return
 
         logger.info("[PREDICTOR] Preparing startup with S3 model")
 
         try:
-            # Clean previous if present
             if self._tempdir and os.path.isdir(self._tempdir):
                 shutil.rmtree(self._tempdir, ignore_errors=True)
                 self._tempdir = None
 
-            # Calculate parent directory automatically if not provided
             parent = config.MODEL_TMP_DIR_PARENT
             if not parent:
-                # Use system temporary directory as default
                 parent = tempfile.gettempdir()
                 if DEBUG_MODE:
                     logger.debug("[PREDICTOR] Using automatic temp directory: %s", parent)
@@ -253,9 +245,7 @@ class PredictorService:
                 logger.debug("[PREDICTOR] Created temp directory: %s", self._tempdir)
 
             self._download_model_from_s3_to(dest_path)
-            # Point to this file
             self.local_model_path = dest_path
-            # Force reload
             self._loaded = False
             self._onnx_session = None
             self._pt_infer = None
@@ -269,17 +259,15 @@ class PredictorService:
             logger.error("   - Check if AWS_SECRET_ACCESS_KEY is set: %s", "SET" if config.AWS_SECRET_ACCESS_KEY else "NOT SET")
             logger.error("   - S3 key: %s", self.s3_model_key)
 
-            # Auto-enable mock predictions if they're not already enabled
             if not self.enable_mock_predictions:
                 logger.warning("[PREDICTOR] Automatically enabling mock predictions due to S3 error")
                 self.enable_mock_predictions = True
 
-            # Clean up temp directory if created
             if self._tempdir and os.path.isdir(self._tempdir):
                 shutil.rmtree(self._tempdir, ignore_errors=True)
                 self._tempdir = None
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Removes temporary model directory if it exists."""
         if self._tempdir and os.path.isdir(self._tempdir):
             logger.info("[PREDICTOR] Cleaning up temporary directory: %s", self._tempdir)
@@ -287,6 +275,7 @@ class PredictorService:
         self._tempdir = None
 
     def _preprocess_pil(self, img: Image.Image) -> np.ndarray:
+        """Preprocess PIL image for model inference."""
         if DEBUG_MODE:
             logger.debug("[PREDICTOR] Preprocessing image from %s to %dx%d", img.size, self.img_size, self.img_size)
 
@@ -294,9 +283,8 @@ class PredictorService:
         img = img.resize((self.img_size, self.img_size))
         arr = np.array(img).astype(np.float32) / 255.0
         arr = (arr - IMAGENET_MEAN) / IMAGENET_STD
-        # HWC -> CHW
         arr = np.transpose(arr, (2, 0, 1))
-        arr = np.expand_dims(arr, 0)  # NCHW
+        arr = np.expand_dims(arr, 0)
 
         if DEBUG_MODE:
             logger.debug("[PREDICTOR] Preprocessed tensor shape: %s", arr.shape)
@@ -304,10 +292,10 @@ class PredictorService:
         return arr
 
     def predict_image_bytes(self, image_bytes: bytes) -> Dict[str, Any]:
+        """Predict banana ripeness from image bytes."""
         start_time = time.time()
         logger.info("[PREDICTOR] Starting prediction (image size: %d bytes)", len(image_bytes))
 
-        # Test mode: return mock predictions if no model is loaded and mock is enabled
         if not self._loaded and not self._can_load_model():
             if self.enable_mock_predictions:
                 logger.info("[PREDICTOR] Test mode activated - Generating mock prediction")
@@ -341,7 +329,6 @@ class PredictorService:
             outputs = self._onnx_session.run(None, {input_name: inp})
             logits = outputs[0]
 
-            # softmax
             exps = np.exp(logits - np.max(logits, axis=1, keepdims=True))
             probs = exps / np.sum(exps, axis=1, keepdims=True)
             idx = int(np.argmax(probs[0]))
@@ -384,6 +371,7 @@ class PredictorService:
         return result
 
     def predict_from_s3_key(self, key: str) -> Dict[str, Any]:
+        """Predict banana ripeness from S3 stored image."""
         logger.info("[PREDICTOR] Predicting from S3 key: %s", key)
         s3 = get_s3()
         tmp_path = s3.download_to_tempfile(key)
@@ -401,7 +389,6 @@ class PredictorService:
             logger.debug("[PREDICTOR] Days mapping: %s", class_to_days)
             logger.debug("[PREDICTOR] Expected days before randomization: %.2f", expected)
 
-        # Add small random variation ±0.5 day for ripe/overripe/unripe
         top_idx = int(np.argmax(probs))
         top_class = self.class_names[top_idx]
         if top_class in ["unripe", "ripe", "overripe"]:
@@ -410,7 +397,6 @@ class PredictorService:
             if DEBUG_MODE:
                 logger.debug("[PREDICTOR] Added variation %.2f for class %s", variation, top_class)
 
-        # Clamp between 0 and 7 days for safety
         clamped = max(0.0, min(7.0, expected))
 
         if DEBUG_MODE and clamped != expected:
@@ -419,7 +405,7 @@ class PredictorService:
         return clamped
 
     def _can_load_model(self) -> bool:
-        """Checks if a model can be loaded"""
+        """Checks if a model can be loaded."""
         can_load = False
         if self.use_onnx:
             can_load = (self.local_model_path and self.local_model_path.endswith('.onnx') and os.path.exists(self.local_model_path)) or \
@@ -438,11 +424,10 @@ class PredictorService:
         return can_load
 
     def _get_mock_prediction(self) -> Dict[str, Any]:
-        """Returns a mock prediction for testing"""
+        """Returns a mock prediction for testing."""
         if DEBUG_MODE:
             logger.debug("[PREDICTOR] Generating mock prediction")
 
-        # Generate realistic random prediction
         predicted_class = random.choice(self.class_names)
         confidence = random.uniform(0.6, 0.95)
         predicted_index = self.class_names.index(predicted_class)
@@ -450,7 +435,6 @@ class PredictorService:
         if DEBUG_MODE:
             logger.debug("   Mock class: %s, confidence: %.2f", predicted_class, confidence)
 
-        # Mock probabilities
         class_prob = {}
         remaining_prob = 1.0 - confidence
         for i, class_name in enumerate(self.class_names):
@@ -459,7 +443,6 @@ class PredictorService:
             else:
                 class_prob[class_name] = remaining_prob / (len(self.class_names) - 1)
 
-        # Expected days based on predicted class
         class_to_days = get_class_to_days_mapping()
         expected_days = class_to_days.get(predicted_class, 3.0)
 
@@ -521,7 +504,9 @@ class PredictorService:
 
 _predictor_singleton: Optional[PredictorService] = None
 
+
 def get_predictor() -> PredictorService:
+    """Get the global predictor service instance."""
     global _predictor_singleton
     if _predictor_singleton is None:
         _predictor_singleton = PredictorService()

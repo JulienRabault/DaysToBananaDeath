@@ -6,11 +6,15 @@ python-multipart>=0.0.9
 Pillow>=10.0.0
 numpy>=1.24.0
 python-dotenv>=1.0.0
+slowapi
+redis
+httpx
+mypy>=1.8.0
+ruff>=0.1.8
 
-# Optionnel si vous utilisez un modèle ONNX
 onnxruntime>=1.16.0
 
-# Optionnel si vous chargez un .ckpt via ml/src (PyTorch)
+# Optional if loading a .ckpt via ml/src (PyTorch)
 # torch, torchvision, lightning, albumentations, omegaconf, torchmetrics, wandb
 # torch>=2.2.0
 # torchvision>=0.17.0

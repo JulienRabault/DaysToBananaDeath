@@ -1,19 +1,15 @@
-"""
-Configuration management for the banana classifier API.
-Handles loading environment variables from .env file in development
-and from system environment in production.
-"""
+"""Configuration management for the banana classifier API."""
 
 import os
 import warnings
 from typing import Optional, Set
 from pathlib import Path
+from pydantic import BaseSettings
 
-# Try to load .env file if it exists (development)
+
 try:
     from dotenv import load_dotenv
 
-    # Look for .env file in project root
     env_path = Path(__file__).parent.parent.parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
@@ -21,7 +17,6 @@ try:
     else:
         print("[CONFIG] No .env file found, using system environment variables")
 except ImportError:
-    # dotenv not installed, use system environment (production)
     print("[CONFIG] python-dotenv not available, using system environment variables")
 
 
@@ -65,10 +60,9 @@ def _get_env_float_with_warning(key: str, default: str, warn_on_default: bool = 
     return float(value)
 
 
-class Config:
+class Config(BaseSettings):
     """Configuration class that loads all environment variables."""
 
-    # Define expected environment variables
     EXPECTED_ENV_VARS: Set[str] = {
         "MODEL_IMG_SIZE", "MODEL_TYPE", "MODEL_FORMAT", "INFERENCE_DEVICE",
         "MODEL_LOCAL_PATH", "MODEL_S3_KEY", "WANDB_RUN_PATH", "WANDB_ARTIFACT",
@@ -77,55 +71,50 @@ class Config:
         "DAYS_EXPECTED_UNRIPE", "DAYS_EXPECTED_RIPE", "DAYS_EXPECTED_OVERRIPE",
         "DAYS_EXPECTED_ROTTEN", "DAYS_EXPECTED_UNKNOWNS",
         "DAYS_UNRIPE_MIN", "DAYS_RIPE_MIN", "DAYS_RIPE_MAX", "DAYS_OVERRIPE_MAX",
-        "LOG_LEVEL", "ENABLE_MOCK_PREDICTIONS", "FRONTEND_ORIGIN",
+        "LOG_LEVEL", "ENABLE_MOCK_PREDICTIONS", "ENABLE_CORRECTIONS", "FRONTEND_ORIGIN",
         "DATASET_PREFIX", "CORRECTIONS_PREFIX", "CORRECTION_COUNTER_KEY", "CORRECTION_THRESHOLD",
-        "UPLOADS_PREFIX", "UPLOAD_PREFIX", "ALERT_WEBHOOK_URL", "S3_ENDPOINT_URL"
+        "UPLOADS_PREFIX", "UPLOAD_PREFIX", "ALERT_WEBHOOK_URL", "S3_ENDPOINT_URL",
+        "RECAPTCHA_SECRET_KEY", "RECAPTCHA_MIN_SCORE", "REDIS_URL",
+        "RATE_LIMIT_PREDICT", "RATE_LIMIT_CORRECTION", "RATE_LIMIT_UPLOAD",
+        "PREDICT_LIMIT", "CORRECTION_LIMIT", "UPLOAD_LIMIT"
     }
 
-    # Model Configuration
     MODEL_IMG_SIZE: int = _get_env_int_with_warning("MODEL_IMG_SIZE", "224")
     MODEL_TYPE: str = _get_env_with_warning("MODEL_TYPE", "resnet50")
     MODEL_FORMAT: str = _get_env_with_warning("MODEL_FORMAT", "ckpt")
     INFERENCE_DEVICE: str = _get_env_with_warning("INFERENCE_DEVICE", "cpu")
 
-    # Model Sources (no warnings for optional values)
     MODEL_LOCAL_PATH: Optional[str] = os.getenv("MODEL_LOCAL_PATH") or None
     MODEL_S3_KEY: Optional[str] = os.getenv("MODEL_S3_KEY") or None
     WANDB_RUN_PATH: Optional[str] = os.getenv("WANDB_RUN_PATH") or None
     WANDB_ARTIFACT: Optional[str] = os.getenv("WANDB_ARTIFACT") or None
 
-    # S3 Configuration (no warnings for optional AWS credentials)
     AWS_ACCESS_KEY_ID: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
     AWS_REGION: str = _get_env_with_warning("AWS_REGION", "us-east-1")
     S3_BUCKET_NAME: Optional[str] = os.getenv("S3_BUCKET_NAME")
 
-    # Model temporary directory (optional)
     MODEL_TMP_DIR_PARENT: Optional[str] = os.getenv("MODEL_TMP_DIR_PARENT")
 
-    # Days mapping for banana ripeness
     DAYS_EXPECTED_UNRIPE: float = _get_env_float_with_warning("DAYS_EXPECTED_UNRIPE", "6.0")
     DAYS_EXPECTED_RIPE: float = _get_env_float_with_warning("DAYS_EXPECTED_RIPE", "4.0")
     DAYS_EXPECTED_OVERRIPE: float = _get_env_float_with_warning("DAYS_EXPECTED_OVERRIPE", "1.5")
     DAYS_EXPECTED_ROTTEN: float = _get_env_float_with_warning("DAYS_EXPECTED_ROTTEN", "0.0")
     DAYS_EXPECTED_UNKNOWNS: float = _get_env_float_with_warning("DAYS_EXPECTED_UNKNOWNS", "2.0")
 
-    # Days to class thresholds
     DAYS_UNRIPE_MIN: int = _get_env_int_with_warning("DAYS_UNRIPE_MIN", "5")
     DAYS_RIPE_MIN: int = _get_env_int_with_warning("DAYS_RIPE_MIN", "2")
     DAYS_RIPE_MAX: int = _get_env_int_with_warning("DAYS_RIPE_MAX", "4")
     DAYS_OVERRIPE_MAX: int = _get_env_int_with_warning("DAYS_OVERRIPE_MAX", "1")
 
-    # Logging
     LOG_LEVEL: str = _get_env_with_warning("LOG_LEVEL", "INFO").upper()
 
-    # Mock predictions
     ENABLE_MOCK_PREDICTIONS: bool = _get_env_bool_with_warning("ENABLE_MOCK_PREDICTIONS", "true")
 
-    # API Configuration
+    ENABLE_CORRECTIONS: bool = _get_env_bool_with_warning("ENABLE_CORRECTIONS", "true")
+
     FRONTEND_ORIGIN: str = _get_env_with_warning("FRONTEND_ORIGIN", "*")
 
-    # Dataset and Corrections Configuration
     DATASET_PREFIX: str = _get_env_with_warning("DATASET_PREFIX", "dataset_new")
     CORRECTIONS_PREFIX: str = _get_env_with_warning("CORRECTIONS_PREFIX", "corrections")
     CORRECTION_COUNTER_KEY: str = _get_env_with_warning("CORRECTION_COUNTER_KEY", "metrics/corrections.json")
@@ -133,23 +122,31 @@ class Config:
     UPLOADS_PREFIX: str = _get_env_with_warning("UPLOADS_PREFIX", "uploads")
     UPLOAD_PREFIX: str = _get_env_with_warning("UPLOAD_PREFIX", "incoming")
 
-    # Webhooks and Alerts
     ALERT_WEBHOOK_URL: Optional[str] = os.getenv("ALERT_WEBHOOK_URL")
 
-    # S3 Configuration additional
     S3_ENDPOINT_URL: Optional[str] = os.getenv("S3_ENDPOINT_URL")
+
+    RECAPTCHA_SECRET_KEY: Optional[str] = os.getenv("RECAPTCHA_SECRET_KEY")
+    RECAPTCHA_MIN_SCORE: float = _get_env_float_with_warning("RECAPTCHA_MIN_SCORE", "0.5")
+    REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
+
+    RATE_LIMIT_PREDICT: int = _get_env_int_with_warning("RATE_LIMIT_PREDICT", "5")
+    RATE_LIMIT_CORRECTION: int = _get_env_int_with_warning("RATE_LIMIT_CORRECTION", "10")
+    RATE_LIMIT_UPLOAD: int = _get_env_int_with_warning("RATE_LIMIT_UPLOAD", "15")
+
+    PREDICT_LIMIT: str = _get_env_with_warning("PREDICT_LIMIT", "30 per minute")
+    CORRECTION_LIMIT: str = _get_env_with_warning("CORRECTION_LIMIT", "10 per minute")
+    UPLOAD_LIMIT: str = _get_env_with_warning("UPLOAD_LIMIT", "50 per hour")
 
     @classmethod
     def validate(cls) -> None:
         """Validate required configuration."""
         errors = []
 
-        # Check if we're using mock predictions or real model
         if not cls.ENABLE_MOCK_PREDICTIONS:
             if not cls.MODEL_LOCAL_PATH and not cls.MODEL_S3_KEY:
                 errors.append("Either MODEL_LOCAL_PATH or MODEL_S3_KEY must be set when mock predictions are disabled")
 
-        # Check S3 configuration if S3 is used
         if cls.MODEL_S3_KEY and not cls.S3_BUCKET_NAME:
             errors.append("S3_BUCKET_NAME is required when using MODEL_S3_KEY")
 
@@ -167,6 +164,7 @@ class Config:
         print(f"  Device: {cls.INFERENCE_DEVICE}")
         print(f"  Log level: {cls.LOG_LEVEL}")
         print(f"  Mock predictions: {cls.ENABLE_MOCK_PREDICTIONS}")
+        print(f"  Corrections enabled: {cls.ENABLE_CORRECTIONS}")
         print(f"  Has local model: {bool(cls.MODEL_LOCAL_PATH)}")
         print(f"  Has S3 model: {bool(cls.MODEL_S3_KEY)}")
         print(f"  S3 bucket: {cls.S3_BUCKET_NAME or 'Not configured'}")
@@ -186,8 +184,6 @@ class Config:
                     )
 
 
-# Create global config instance
 config = Config()
 
-# Check for unexpected environment variables at startup
 config.check_unexpected_env_vars()
