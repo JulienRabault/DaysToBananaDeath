@@ -19,7 +19,7 @@ export const FileDropzone = ({ onFileSelect, disabled }: FileDropzoneProps) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp'], // Remis .webp - conversion backend
     },
     multiple: false,
     disabled,

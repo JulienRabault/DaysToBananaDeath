@@ -7,6 +7,9 @@ import posixpath
 from datetime import datetime, timezone
 import json as _json
 from urllib import request as _urlreq
+import base64
+import io
+from PIL import Image
 
 from ..services.s3 import get_s3
 from ..services.predictor import get_predictor
@@ -15,6 +18,85 @@ from ...config import config
 router = APIRouter(prefix="/corrections", tags=["corrections"])
 
 CLASS_NAMES = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']
+
+
+def optimize_image_for_training(image_bytes: bytes, original_filename: str = "image") -> tuple[bytes, str]:
+    """
+    Convertit n'importe quelle image vers le format optimal pour l'entraînement.
+
+    Args:
+        image_bytes: Données brutes de l'image
+        original_filename: Nom de fichier original pour préserver certaines infos
+
+    Returns:
+        tuple: (image_bytes_optimized, new_filename)
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Ouvrir l'image avec PIL
+        img = Image.open(io.BytesIO(image_bytes))
+
+        # Informations sur l'image originale
+        original_format = img.format
+        original_size = img.size
+        original_mode = img.mode
+
+        logger.info(f"[IMAGE_OPT] Original: {original_format} {original_size} {original_mode}")
+
+        # Convertir en RGB si nécessaire (pour supporter RGBA, P, etc.)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            # Créer un fond blanc pour les images avec transparence
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        # Redimensionner si l'image est trop grande (optimisation pour l'entraînement)
+        max_size = 512  # Taille max recommandée pour l'entraînement
+        if max(img.size) > max_size:
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            logger.info(f"[IMAGE_OPT] Resized to: {img.size}")
+
+        # Sauvegarder en JPEG optimisé
+        output_buffer = io.BytesIO()
+
+        # Qualité optimale pour l'entraînement : 90%
+        # - Assez haute pour préserver les détails importants
+        # - Assez compressée pour réduire la taille de stockage
+        img.save(
+            output_buffer,
+            format='JPEG',
+            quality=90,
+            optimize=True,
+            progressive=True  # JPEG progressif pour de meilleures performances
+        )
+
+        optimized_bytes = output_buffer.getvalue()
+
+        # Générer nouveau nom de fichier
+        base_name = os.path.splitext(original_filename)[0]
+        new_filename = f"{base_name}_optimized.jpg"
+
+        # Statistiques de compression
+        original_size_bytes = len(image_bytes)
+        optimized_size_bytes = len(optimized_bytes)
+        compression_ratio = (1 - optimized_size_bytes / original_size_bytes) * 100
+
+        logger.info(f"[IMAGE_OPT] Optimized: JPEG {img.size} RGB")
+        logger.info(f"[IMAGE_OPT] Size: {original_size_bytes} -> {optimized_size_bytes} bytes ({compression_ratio:.1f}% reduction)")
+        logger.info(f"[IMAGE_OPT] Filename: {original_filename} -> {new_filename}")
+
+        return optimized_bytes, new_filename
+
+    except Exception as e:
+        logger.error(f"[IMAGE_OPT] Failed to optimize image: {str(e)}")
+        # En cas d'erreur, retourner l'image originale
+        return image_bytes, original_filename
 
 
 class CorrectionRequest(BaseModel):
@@ -56,10 +138,6 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
     if not body.image_key or body.image_key.strip() == "":
         raise HTTPException(status_code=400, detail="image_key is required and cannot be empty")
 
-    # Determine final class
-    final_label: Optional[str] = None
-    validation_info: Optional[Dict[str, Any]] = None
-
     predictor = get_predictor()
 
     if body.corrected_label:
@@ -75,10 +153,8 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
             if body.days_left is None:
                 raise HTTPException(status_code=400, detail="days_left is required when is_banana is True")
 
-            # Use the intelligent mapping from predictor service
             final_label = predictor.get_class_from_days_left(float(body.days_left))
 
-            # Validate the correction if user provided both days_left and corrected_label
             if body.corrected_label:
                 validation_info = predictor.validate_correction(float(body.days_left), body.corrected_label)
 
@@ -115,18 +191,20 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
             filename = body.temp_file_data.get("filename", "image.jpg")
             content_type = body.temp_file_data.get("content_type", "image/jpeg")
 
-            # Generate file extension
-            _, ext = os.path.splitext(filename)
-            ext = ext if ext else ".jpg"
+            # Optimize image for training
+            optimized_image, new_filename = optimize_image_for_training(image_content, filename)
+
+            # Force JPG extension for all corrections
+            ext = ".jpg"
 
             # Upload directly to dataset structure (no need for intermediate upload)
             dest_key = posixpath.join(dataset_prefix, final_label, f"{cid}{ext}")
 
             # Upload the image directly to final destination
             s3.upload_fileobj(
-                io.BytesIO(image_content),
+                io.BytesIO(optimized_image),
                 dest_key,
-                content_type=content_type
+                content_type="image/jpeg"  # Force JPEG content type
             )
 
             # For record keeping, use the destination as source
@@ -138,17 +216,39 @@ async def submit_correction(body: CorrectionRequest) -> Dict[str, Any]:
             # This is an existing S3 image, copy it
             logging.info(f"[CORRECTION] Processing existing S3 image: {source_key}")
 
-            # Extract extension from existing S3 key
-            _, ext = os.path.splitext(body.image_key)
-            ext = ext if ext else ".jpg"
+            # For existing S3 images, we need to download, optimize and re-upload as JPG
+            try:
+                # Download the original image
+                image_data = s3.download_fileobj(source_key)
 
-            # Destination in dataset structure
-            dest_key = posixpath.join(dataset_prefix, final_label, f"{cid}{ext}")
+                # Get original filename for optimization
+                original_filename = os.path.basename(source_key)
 
-            # Copy image to the structured dataset location
-            s3.copy_object(source_key=source_key, dest_key=dest_key)
+                # Optimize image for training (converts to JPG)
+                optimized_image, new_filename = optimize_image_for_training(image_data, original_filename)
 
-            logging.info(f"[CORRECTION] S3 image copied from {source_key} to {dest_key}")
+                # Force JPG extension for all corrections
+                ext = ".jpg"
+
+                # Destination in dataset structure
+                dest_key = posixpath.join(dataset_prefix, final_label, f"{cid}{ext}")
+
+                # Upload the optimized JPG image
+                s3.upload_fileobj(
+                    io.BytesIO(optimized_image),
+                    dest_key,
+                    content_type="image/jpeg"
+                )
+
+                logging.info(f"[CORRECTION] S3 image downloaded, optimized and uploaded as JPG to: {dest_key}")
+
+            except Exception as e:
+                logging.error(f"[CORRECTION] Failed to process existing S3 image: {str(e)}")
+                # Fallback: simple copy with JPG extension
+                ext = ".jpg"
+                dest_key = posixpath.join(dataset_prefix, final_label, f"{cid}{ext}")
+                s3.copy_object(source_key=source_key, dest_key=dest_key)
+                logging.info(f"[CORRECTION] Fallback: S3 image copied from {source_key} to {dest_key}")
 
         # record JSON
         record = {

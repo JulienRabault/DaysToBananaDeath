@@ -66,6 +66,14 @@ class S3Service:
         tmp.close()
         return tmp.name
 
+    def download_fileobj(self, key: str) -> bytes:
+        """Download file content directly to memory as bytes"""
+        import io
+        buffer = io.BytesIO()
+        self.s3.download_fileobj(self.bucket, key, buffer)
+        buffer.seek(0)
+        return buffer.getvalue()
+
     def copy_object(self, source_key: str, dest_key: str) -> None:
         copy_source = {"Bucket": self.bucket, "Key": source_key}
         self.s3.copy(copy_source, self.bucket, dest_key)

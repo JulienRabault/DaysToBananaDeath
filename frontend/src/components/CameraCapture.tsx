@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ErrorAlert } from './ErrorAlert';
+import { useSettings } from '../store/useSettings';
+import { useTranslation } from '../utils/i18n';
 
 interface CameraCaptureProps {
   onCapture: (file: File) => void;
@@ -7,26 +9,71 @@ interface CameraCaptureProps {
 }
 
 export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
+  const { language } = useSettings();
+  const t = useTranslation(language);
+
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const checkCameraPermission = async () => {
+    try {
+      const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      setHasPermission(result.state === 'granted');
+
+      result.addEventListener('change', () => {
+        setHasPermission(result.state === 'granted');
+      });
+    } catch (err) {
+      console.log('Permission API not supported:', err);
+      setHasPermission(null);
+    }
+  };
 
   const startCamera = async () => {
     try {
       setError(null);
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+
+      // Vérifier d'abord si les médias sont supportés
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(t.cameraNotSupported);
+      }
+
+      const constraints = {
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false,
-      });
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
+      setHasPermission(true);
+
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (err) {
-      setError('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
+    } catch (err: any) {
       console.error('Camera error:', err);
+      let errorMessage = t.cameraPermissionError;
+
+      if (err.name === 'NotAllowedError') {
+        errorMessage = t.cameraPermissionDenied;
+      } else if (err.name === 'NotFoundError') {
+        errorMessage = t.cameraNotFound;
+      } else if (err.name === 'NotSupportedError') {
+        errorMessage = t.cameraNotSupported;
+      } else if (err.name === 'NotReadableError') {
+        errorMessage = t.cameraInUse;
+      }
+
+      setError(errorMessage);
+      setHasPermission(false);
     }
   };
 
@@ -66,6 +113,7 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
   };
 
   useEffect(() => {
+    checkCameraPermission();
     return () => {
       stopCamera();
     };
@@ -82,7 +130,7 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
           playsInline
           muted
           className={`w-full ${stream && !isCapturing ? 'block' : 'hidden'}`}
-          aria-label="Flux vidéo de la caméra"
+          aria-label={t.cameraVideoLabel}
         />
         <canvas ref={canvasRef} className="hidden" />
 
@@ -92,7 +140,7 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
               onClick={startCamera}
               disabled={disabled}
               className="rounded-lg bg-primary-600 px-6 py-3 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
-              aria-label="Démarrer la caméra"
+              aria-label={t.cameraStartButton}
             >
               <svg
                 className="mx-auto mb-2 h-8 w-8"
@@ -114,7 +162,7 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
                   d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
-              Démarrer la caméra
+              {t.cameraStartButton}
             </button>
           </div>
         )}
@@ -127,13 +175,13 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
             disabled={disabled}
             className="flex-1 rounded-lg bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
           >
-            Capturer la photo
+            {t.cameraCaptureButton}
           </button>
           <button
             onClick={stopCamera}
             className="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:border-gray-600 dark:hover:bg-gray-800"
           >
-            Annuler
+            {t.predictionCancel}
           </button>
         </div>
       )}
@@ -143,7 +191,7 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
           onClick={resetCapture}
           className="w-full rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:border-gray-600 dark:hover:bg-gray-800"
         >
-          Prendre une nouvelle photo
+          {t.cameraNewPhotoButton}
         </button>
       )}
     </div>

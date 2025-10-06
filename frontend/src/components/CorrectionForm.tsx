@@ -3,20 +3,26 @@ import { PredictResponse, CorrectionPayload } from '../types';
 import { submitCorrection } from '../api/endpoints';
 import { ErrorAlert } from './ErrorAlert';
 import { Spinner } from './Spinner';
+import { useSettings } from '../store/useSettings';
+import { useTranslation, translateClass } from '../utils/i18n';
 
 interface CorrectionFormProps {
   prediction: PredictResponse;
   onSuccess: () => void;
-  onReset: () => void; // Nouvelle prop pour le reset
+  onReset: () => void;
 }
 
 export const CorrectionForm = ({ prediction, onSuccess, onReset }: CorrectionFormProps) => {
+  const { language } = useSettings();
+  const t = useTranslation(language);
+
   const [isBanana, setIsBanana] = useState(true);
   const [daysLeft, setDaysLeft] = useState(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false); // État pour le menu dépliable
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [correctionSubmitted, setCorrectionSubmitted] = useState(false); // Nouveau state
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,16 +43,14 @@ export const CorrectionForm = ({ prediction, onSuccess, onReset }: CorrectionFor
         },
       };
 
-      // Include temp file data if this is a temporary image
       if (prediction.temp_file_data) {
         payload.temp_file_data = prediction.temp_file_data;
       }
 
       await submitCorrection(payload);
       setSuccess(true);
-      setTimeout(() => {
-        onSuccess();
-      }, 1500);
+      setCorrectionSubmitted(true);
+      // Ne plus appeler onSuccess() - on garde tout affiché
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l\'envoi de la correction');
     } finally {
@@ -54,156 +58,187 @@ export const CorrectionForm = ({ prediction, onSuccess, onReset }: CorrectionFor
     }
   };
 
-  if (success) {
-    return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center dark:border-green-800 dark:bg-green-950">
-        <svg
-          className="mx-auto h-12 w-12 text-green-600 dark:text-green-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-        <p className="mt-2 font-medium text-green-800 dark:text-green-200">
-          Correction envoyée avec succès
-        </p>
-        <button
-          onClick={onReset}
-          className="mt-3 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:bg-green-700 dark:hover:bg-green-600"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Nouvelle prédiction
-        </button>
-      </div>
-    );
-  }
+  const getPredictedClass = () => {
+    if (daysLeft >= 5) return 'unripe';
+    if (daysLeft >= 2 && daysLeft <= 4) return 'ripe';
+    if (daysLeft === 1) return 'overripe';
+    if (daysLeft === 0) return 'rotten';
+    return 'unknowns';
+  };
+
+  const getClassEmoji = (className: string) => {
+    switch (className.toLowerCase()) {
+      case 'unripe': return '🟢';
+      case 'ripe': return '🟡';
+      case 'overripe': return '🟠';
+      case 'rotten': return '🟤';
+      default: return '❓';
+    }
+  };
 
   return (
-    <div className="space-y-4 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-      {/* Header avec boutons */}
-      <div className="flex items-center justify-between gap-3 p-4 pb-0">
-        <button
-          onClick={onReset}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Nouvelle prédiction
-        </button>
-
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-        >
-          <svg
-            className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+    <div className="rounded-2xl border border-yellow-200/50 bg-white/60 backdrop-blur-sm shadow-lg dark:border-gray-700/50 dark:bg-gray-800/60">
+      {/* Header avec bouton d'expansion et bouton reset intégré */}
+      <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-3 text-left flex-1"
+            aria-expanded={isExpanded}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-          {isExpanded ? 'Masquer' : 'Soumettre une correction'}
-        </button>
+            <div className={`p-2 rounded-lg ${success ? 'bg-green-100 dark:bg-green-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+              {success ? (
+                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                </svg>
+                )}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {success ? '✅ Correction envoyée' : t.correctionTitle}
+              </h3>
+              {success && (
+                <p className="text-sm text-green-600 dark:text-green-300">
+                  Faites une nouvelle prédiction pour corriger à nouveau
+                </p>
+              )}
+            </div>
+          </button>
+
+          {/* Boutons d'action dans l'en-tête */}
+          <div className="flex items-center gap-3">
+            <svg
+              className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </div>
+        </div>
       </div>
 
-      {/* Contenu dépliable */}
-      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-        <form onSubmit={handleSubmit} className="space-y-6 p-4 pt-0">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Corriger la prédiction</h3>
+      {/* Contenu du formulaire */}
+      {isExpanded && (
+        <div className="p-6">
+          {error && (
+            <div className="mb-6">
+              <ErrorAlert error={error} onDismiss={() => setError(null)} />
+            </div>
+          )}
 
-          {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
+          {/* Message de succès affiché dans le formulaire */}
+          {success && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-700">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                  Correction envoyée avec succès ! Pour soumettre une nouvelle correction, effectuez d'abord une nouvelle prédiction.
+                </span>
+              </div>
+            </div>
+          )}
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label htmlFor="is-banana" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                C&apos;est une banane ?
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Question banane ou pas */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
+                Est-ce bien une banane ?
               </label>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isBanana}
-                id="is-banana"
-                onClick={() => setIsBanana(!isBanana)}
-                className={`
-                  relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
-                  transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
-                  ${isBanana ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}
-                `}
-              >
-                <span
-                  className={`
-                    pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0
-                    transition duration-200 ease-in-out
-                    ${isBanana ? 'translate-x-5' : 'translate-x-0'}
-                  `}
-                />
-              </button>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={isBanana}
+                    onChange={() => setIsBanana(true)}
+                    disabled={success}
+                    className="text-orange-600 focus:ring-orange-500 disabled:opacity-50"
+                  />
+                  <span className={`text-sm text-gray-700 dark:text-gray-300 ${success ? 'opacity-50' : ''}`}>
+                    🍌 {t.yes}
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!isBanana}
+                    onChange={() => setIsBanana(false)}
+                    disabled={success}
+                    className="text-orange-600 focus:ring-orange-500 disabled:opacity-50"
+                  />
+                  <span className={`text-sm text-gray-700 dark:text-gray-300 ${success ? 'opacity-50' : ''}`}>
+                    ❌ {t.no}
+                  </span>
+                </label>
+              </div>
             </div>
 
+            {/* Slider pour les jours si c'est une banane */}
             {isBanana && (
-              <div className="space-y-2">
-                <label htmlFor="days-left" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Jours restants avant péremption
+              <div>
+                <label className={`text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block ${success ? 'opacity-50' : ''}`}>
+                  Jours restants avant que la banane soit trop mûre :
                 </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    id="days-left"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    value={daysLeft}
-                    onChange={(e) => setDaysLeft(parseFloat(e.target.value))}
-                    className="flex-1 accent-primary-600"
-                    aria-valuemin={0}
-                    aria-valuemax={10}
-                    aria-valuenow={daysLeft}
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    value={daysLeft}
-                    onChange={(e) => setDaysLeft(parseFloat(e.target.value))}
-                    className="w-20 rounded-lg border border-gray-300 px-3 py-1.5 text-center focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
-                    aria-label="Nombre de jours"
-                  />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="0"
+                      max="7"
+                      value={daysLeft}
+                      onChange={(e) => setDaysLeft(parseInt(e.target.value))}
+                      disabled={success}
+                      className={`flex-1 h-2 bg-gradient-to-r from-red-200 via-yellow-200 to-green-200 rounded-lg appearance-none cursor-pointer dark:from-red-900 dark:via-yellow-900 dark:to-green-900 ${success ? 'opacity-50' : ''}`}
+                    />
+                    <span className={`text-lg font-semibold text-gray-900 dark:text-white min-w-[3rem] text-center ${success ? 'opacity-50' : ''}`}>
+                      {daysLeft}
+                    </span>
+                  </div>
+
+                  {/* Aperçu de la classification */}
+                  <div className={`flex items-center gap-3 p-3 bg-gray-50 rounded-lg dark:bg-gray-700/50 ${success ? 'opacity-50' : ''}`}>
+                    <span className="text-lg">{getClassEmoji(getPredictedClass())}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Cela correspond à : <strong>{translateClass(getPredictedClass(), language)}</strong>
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {daysLeft === 0 ? 'Périmée' : daysLeft === 1 ? '1 jour' : `${daysLeft} jours`}
-                </p>
               </div>
             )}
-          </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <>
-                <Spinner size="sm" />
-                Envoi en cours...
-              </>
-            ) : (
-              'Envoyer la correction'
+            {/* Bouton de soumission uniquement */}
+            {!success && (
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-6 py-3 font-semibold text-white shadow-lg hover:from-orange-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 transition-all"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Spinner size="sm" />
+                      Envoi...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                      </svg>
+                      {t.correctionSubmit}
+                    </>
+                  )}
+                </button>
+              </div>
             )}
-          </button>
-        </form>
-      </div>
+          </form>
+        </div>
+      )}
     </div>
   );
-};
+}

@@ -44,9 +44,8 @@ export const Predict = () => {
   };
 
   const handleCorrectionSuccess = () => {
-    setSelectedFile(null);
-    setImagePreview(null);
-    setPrediction(null);
+    // Ne plus effacer automatiquement - on garde tout affiché
+    // L'utilisateur utilisera le bouton "Nouvelle prédiction" pour reset
   };
 
   const handleReset = () => {
@@ -96,6 +95,19 @@ export const Predict = () => {
                 className="mx-auto max-h-96 object-contain"
               />
             </div>
+
+            {/* Bouton "Nouvelle image" sous l'image */}
+            {prediction && (
+              <div className="flex justify-center">
+                <button
+                  onClick={handleReset}
+                  className="w-full max-w-md rounded-xl border-2 border-gray-300 px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
+                >
+                  Nouvelle image
+                </button>
+              </div>
+            )}
+
             {!prediction && (
               <div className="flex gap-3">
                 <button

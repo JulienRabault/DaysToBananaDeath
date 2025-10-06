@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_ENDPOINTS, DEFAULT_RESPONSE_MAPPING } from '../config/api';
 
+type Language = 'fr' | 'en';
+
 interface Settings {
   baseUrl: string;
   endpoints: {
@@ -18,10 +20,12 @@ interface Settings {
     latency_ms: string;
   };
   theme: 'light' | 'dark' | 'system';
+  language: Language;
   setBaseUrl: (url: string) => void;
   setEndpoint: (key: keyof Settings['endpoints'], value: string) => void;
   setResponseMapping: (key: keyof Settings['responseMapping'], value: string) => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  setLanguage: (language: Language) => void;
   resetToDefaults: () => void;
 }
 
@@ -40,6 +44,7 @@ export const useSettings = create<Settings>()(
       },
       responseMapping: DEFAULT_RESPONSE_MAPPING,
       theme: 'system',
+      language: 'fr',
       setBaseUrl: (url) => set({ baseUrl: url.trim() }),
       setEndpoint: (key, value) =>
         set((state) => ({
@@ -50,6 +55,7 @@ export const useSettings = create<Settings>()(
           responseMapping: { ...state.responseMapping, [key]: value.trim() },
         })),
       setTheme: (theme) => set({ theme }),
+      setLanguage: (language) => set({ language }),
       resetToDefaults: () =>
         set({
           baseUrl: getInitialBaseUrl(),
@@ -59,10 +65,12 @@ export const useSettings = create<Settings>()(
             corrections: DEFAULT_ENDPOINTS.CORRECTIONS,
           },
           responseMapping: DEFAULT_RESPONSE_MAPPING,
+          theme: 'system',
+          language: 'fr',
         }),
     }),
     {
-      name: 'banana-app-settings', // Retour au nom original
+      name: 'app-settings',
     }
   )
 );
