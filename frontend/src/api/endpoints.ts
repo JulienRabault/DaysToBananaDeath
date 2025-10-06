@@ -2,6 +2,38 @@ import { apiClient } from './client';
 import { useSettings } from '../store/useSettings';
 import { PredictResponse, CorrectionPayload, HealthResponse } from '../types';
 
+// Define the model info interface
+export interface ModelInfo {
+  name: string;
+  version: string;
+  format: string;
+  imageSize: string;
+  modelType: string;
+  device: string;
+  classes: string[];
+  classMappings?: {
+    days: Record<string, number>;
+    thresholds: Record<string, number>;
+  };
+  modelSources?: {
+    localPath?: string;
+    s3Key?: string;
+    wandbPath?: string;
+    wandbArtifact?: string;
+  };
+  configuration?: {
+    mockPredictions: boolean;
+    logLevel: string;
+    s3Bucket?: string;
+    awsRegion: string;
+  };
+  modelLoaded: boolean;
+  canLoadModel: boolean;
+  modelMetadata?: Record<string, any>;
+  loadedAt?: number;
+  error?: string;
+}
+
 const getFullUrl = (endpoint: string): string => {
   const { baseUrl } = useSettings.getState();
   const cleanBase = baseUrl.replace(/\/$/, '');
@@ -51,4 +83,8 @@ export const submitCorrection = async (
 ): Promise<void> => {
   const { endpoints } = useSettings.getState();
   await apiClient.post<void>(getFullUrl(endpoints.corrections), payload, signal);
+};
+
+export const getModelInfo = async (signal?: AbortSignal): Promise<ModelInfo> => {
+  return apiClient.get<ModelInfo>(getFullUrl('/api/model/info'), signal);
 };

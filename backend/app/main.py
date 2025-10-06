@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api.endpoints.predict import router as predict_router
 from .api.endpoints.presign import router as presign_router
 from .api.endpoints.correction import router as correction_router
+from .api.endpoints.model_info import router as model_info_router
 from .api.services.predictor import get_predictor
 from .config import config
 
@@ -23,6 +24,7 @@ app.add_middleware(
 app.include_router(predict_router, prefix="/api")
 app.include_router(presign_router, prefix="/api")
 app.include_router(correction_router, prefix="/api")
+app.include_router(model_info_router, prefix="/api")
 
 
 @app.on_event("startup")

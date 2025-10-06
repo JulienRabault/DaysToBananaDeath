@@ -510,6 +510,14 @@ class PredictorService:
 
         return validation_result
 
+    def get_class_to_days_mapping(self) -> Dict[str, float]:
+        """Expose the class to days mapping from configuration."""
+        return get_class_to_days_mapping()
+
+    def get_days_to_class_thresholds(self) -> Dict[str, int]:
+        """Expose the thresholds for mapping days_left to class."""
+        return get_days_to_class_thresholds()
+
 
 _predictor_singleton: Optional[PredictorService] = None
 
