@@ -1,20 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
 
 # Routers (imports relatifs)
 from .api.endpoints.predict import router as predict_router
 from .api.endpoints.presign import router as presign_router
 from .api.endpoints.correction import router as correction_router
 from .api.services.predictor import get_predictor
+from .config import config
 
 app = FastAPI(title="Banana Ripeness API", version="0.1.0")
 
 # CORS config
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN] if FRONTEND_ORIGIN != "*" else ["*"],
+    allow_origins=[config.FRONTEND_ORIGIN] if config.FRONTEND_ORIGIN != "*" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

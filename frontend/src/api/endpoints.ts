@@ -35,6 +35,8 @@ export const predictImage = async (file: File, signal?: AbortSignal): Promise<Pr
     confidence: Number(response[responseMapping.confidence] || 0),
     image_key: String(response[responseMapping.image_key] || ''),
     latency_ms: Number(response[responseMapping.latency_ms] || clientLatency),
+    // Include temp_file_data if present in response
+    temp_file_data: response.temp_file_data as PredictResponse['temp_file_data'],
   };
 
   return mappedResponse;

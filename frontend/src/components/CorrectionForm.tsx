@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PredictResponse } from '../types';
+import { PredictResponse, CorrectionPayload } from '../types';
 import { submitCorrection } from '../api/endpoints';
 import { ErrorAlert } from './ErrorAlert';
 import { Spinner } from './Spinner';
@@ -22,7 +22,7 @@ export const CorrectionForm = ({ prediction, onSuccess }: CorrectionFormProps) =
     setIsSubmitting(true);
 
     try {
-      const payload = {
+      const payload: CorrectionPayload = {
         image_key: prediction.image_key,
         is_banana: isBanana,
         ...(isBanana && { days_left: daysLeft }),
@@ -34,6 +34,11 @@ export const CorrectionForm = ({ prediction, onSuccess }: CorrectionFormProps) =
           ts: new Date().toISOString(),
         },
       };
+
+      // Include temp file data if this is a temporary image
+      if (prediction.temp_file_data) {
+        payload.temp_file_data = prediction.temp_file_data;
+      }
 
       await submitCorrection(payload);
       setSuccess(true);

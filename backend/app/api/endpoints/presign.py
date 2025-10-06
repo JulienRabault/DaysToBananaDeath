@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from ..services.s3 import get_s3
+from ...config import config
 
 router = APIRouter(prefix="/presign", tags=["upload"])
 
@@ -21,7 +22,7 @@ class PresignRequest(BaseModel):
 async def presign_upload(body: PresignRequest) -> Dict[str, Any]:
     try:
         s3 = get_s3()
-        folder = body.folder or os.getenv("UPLOAD_PREFIX", "incoming")
+        folder = body.folder or config.UPLOAD_PREFIX
         folder = s3.ensure_prefix(folder)
         name = body.filename or f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex}"
 

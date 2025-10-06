@@ -11,22 +11,25 @@ except Exception:  # pragma: no cover - handled at runtime
     boto3 = None  # type: ignore
     Config = None  # type: ignore
 
+from ...config import config
+
 
 class S3Service:
     def __init__(self):
         if boto3 is None:
             raise RuntimeError("boto3 is required for S3 operations. Install it via backend/requirements.txt")
 
-        self.bucket = os.getenv("S3_BUCKET")
-        region = os.getenv("AWS_REGION", "eu-west-3")
-        endpoint_url = os.getenv("S3_ENDPOINT_URL")  # optional, for MinIO or custom
+        # Use config instead of os.getenv
+        self.bucket = config.S3_BUCKET_NAME or os.getenv("S3_BUCKET")  # Backward compatibility
+        region = config.AWS_REGION
+        endpoint_url = config.S3_ENDPOINT_URL
 
         if not self.bucket:
-            raise RuntimeError("S3_BUCKET env var is required")
+            raise RuntimeError("S3_BUCKET_NAME or S3_BUCKET env var is required")
 
         session = boto3.session.Session(
-            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            aws_access_key_id=config.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY,
             region_name=region,
         )
         self.s3 = session.client("s3", endpoint_url=endpoint_url, config=Config(signature_version="s3v4"))

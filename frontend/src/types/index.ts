@@ -10,10 +10,22 @@ export interface PredictResponse {
   confidence: number;
   image_key: string;
   latency_ms: number;
+  // For temporary images that aren't uploaded to S3 yet
+  temp_file_data?: {
+    content: string;
+    filename: string;
+    content_type: string;
+  };
 }
 
 export interface CorrectionPayload {
   image_key: string;
+  // Include temp file data for images not yet uploaded to S3
+  temp_file_data?: {
+    content: string;
+    filename: string;
+    content_type: string;
+  };
   is_banana: boolean;
   days_left?: number;
   predicted_label: string;

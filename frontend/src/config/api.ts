@@ -1,7 +1,7 @@
 export const DEFAULT_ENDPOINTS = {
   HEALTH: '/health',
-  PREDICT: '/predict',
-  CORRECTIONS: '/corrections',
+  PREDICT: '/api/predict/file',
+  CORRECTIONS: '/api/corrections',
 };
 
 export const DEFAULT_RESPONSE_MAPPING = {

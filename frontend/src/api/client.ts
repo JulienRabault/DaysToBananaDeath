@@ -46,6 +46,9 @@ class ApiClient {
     retries = API_CONFIG.MAX_RETRIES,
     signal?: AbortSignal
   ): Promise<T> {
+    const startTime = Date.now();
+    console.log(`[API] DÉBUT ${options.method || 'GET'} ${url}`);
+
     const attempt = async (retriesLeft: number): Promise<T> => {
       try {
         const response = await this.fetchWithTimeout(
@@ -61,8 +64,13 @@ class ApiClient {
           signal
         );
 
+        const duration = Date.now() - startTime;
+
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'Erreur inconnue');
+          console.error(`[API] ERREUR ${response.status} ${url} (${duration}ms)`);
+          console.error('Détails:', errorText);
+
           let errorMessage = `Erreur ${response.status}`;
 
           try {
@@ -84,14 +92,20 @@ class ApiClient {
           }
 
           throw error;
+        } else {
+          console.log(`[API] SUCCÈS ${response.status} ${url} (${duration}ms)`);
         }
 
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-          return await response.json();
+          const result = await response.json();
+          console.log(`[API] Réponse JSON:`, result);
+          return result;
         }
 
-        return (await response.text()) as T;
+        const textResult = await response.text();
+        console.log(`[API] Réponse texte:`, textResult);
+        return textResult as T;
       } catch (error) {
         if (error instanceof Error) {
           if (error.name === 'AbortError') {

@@ -62,7 +62,7 @@ export const useSettings = create<Settings>()(
         }),
     }),
     {
-      name: 'banana-app-settings',
+      name: 'banana-app-settings', // Retour au nom original
     }
   )
 );
