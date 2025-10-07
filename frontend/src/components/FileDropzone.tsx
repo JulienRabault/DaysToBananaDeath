@@ -51,7 +51,7 @@ export const FileDropzone = ({ onFileSelect, disabled }: FileDropzoneProps) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp'], // Remis .webp - conversion backend
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.avif'], // Ajout du support .avif
     },
     multiple: false,
     disabled: disabled || isResizing,
@@ -106,7 +106,7 @@ export const FileDropzone = ({ onFileSelect, disabled }: FileDropzoneProps) => {
                 Glissez-déposez une image ici, ou cliquez pour sélectionner
               </p>
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
-                PNG, JPG, JPEG, WEBP (redimensionnement automatique si nécessaire)
+                PNG, JPG, JPEG, WEBP, AVIF (redimensionnement automatique si nécessaire)
               </p>
             </>
           )}

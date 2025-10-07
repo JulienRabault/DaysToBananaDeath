@@ -18,10 +18,11 @@ ALLOWED_CONTENT_TYPES: Set[str] = {
     "image/webp",
     "image/gif",
     "image/bmp",
-    "image/tiff"
+    "image/tiff",
+    "image/avif"
 }
 ALLOWED_EXTENSIONS: Set[str] = {
-    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"
+    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".avif"
 }
 MIN_IMAGE_DIMENSION = 32  # pixels
 MAX_IMAGE_DIMENSION = 4096  # pixels
@@ -115,7 +116,7 @@ async def validate_file_content(file: UploadFile) -> bytes:
                     f"(maximum: {MAX_IMAGE_DIMENSION}x{MAX_IMAGE_DIMENSION} pixels)"
                 )
 
-            if img.format not in ['JPEG', 'PNG', 'WEBP', 'GIF', 'BMP', 'TIFF']:
+            if img.format not in ['JPEG', 'PNG', 'WEBP', 'GIF', 'BMP', 'TIFF', 'AVIF']:
                 raise ValidationError(f"Unsupported image format: {img.format}")
 
             logger.info(

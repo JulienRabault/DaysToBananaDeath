@@ -1,5 +1,6 @@
 import { ApiError } from '../types';
 import { API_CONFIG, API_BASE_URL } from '../config/api';
+import { parseApiError } from '../utils/errorUtils';
 
 class ApiClient {
   private async fetchWithTimeout(
@@ -74,74 +75,67 @@ class ApiClient {
           console.error(`[API] ERREUR ${response.status} ${url} (${duration}ms)`);
           console.error('Détails:', errorText);
 
-          let errorMessage = `Erreur ${response.status}`;
-
+          let errorDetails = errorText;
           try {
             const errorJson = JSON.parse(errorText);
-            errorMessage = errorJson.detail || errorJson.message || errorMessage;
+            errorDetails = errorJson;
           } catch {
-            errorMessage = errorText || errorMessage;
+            // Garder le texte original si ce n'est pas du JSON
           }
 
-          const error: ApiError = {
-            message: errorMessage,
+          // Utiliser le nouveau parser d'erreurs
+          const apiError = parseApiError({
             status: response.status,
-            details: errorText,
-          };
+            details: errorDetails,
+            message: `HTTP ${response.status}`
+          });
 
-          if (response.status >= 500 && retriesLeft > 0) {
-            await new Promise((resolve) => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
-            return attempt(retriesLeft - 1);
-          }
-
-          throw error;
-        } else {
-          console.log(`[API] SUCCÈS ${response.status} ${url} (${duration}ms)`);
+          throw apiError;
         }
+
+        // Succès
+        console.log(`[API] SUCCÈS ${response.status} ${url} (${duration}ms)`);
 
         const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const result = await response.json();
-          console.log(`[API] Réponse JSON:`, result);
-          return result;
+        if (contentType?.includes('application/json')) {
+          const data = await response.json();
+          console.log('[API] Réponse JSON:', data);
+          return data;
+        } else {
+          const text = await response.text();
+          console.log('[API] Réponse texte:', text);
+          return text as unknown as T;
         }
+      } catch (error: any) {
+        const duration = Date.now() - startTime;
 
-        const textResult = await response.text();
-        console.log(`[API] Réponse texte:`, textResult);
-        return textResult as T;
-      } catch (error) {
-        if (error instanceof Error) {
-          if (error.name === 'AbortError') {
-            throw {
-              message: 'Requête annulée',
-              details: 'La requête a été annulée par l\'utilisateur',
-            } as ApiError;
-          }
-
-          if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-            if (retriesLeft > 0) {
-              await new Promise((resolve) => setTimeout(resolve, API_CONFIG.RETRY_DELAY));
-              return attempt(retriesLeft - 1);
-            }
-            throw {
-              message: 'Erreur de connexion',
-              details: 'Impossible de joindre le serveur. Vérifiez votre connexion.',
-            } as ApiError;
-          }
-        }
-
-        if ((error as ApiError).status) {
+        // Si c'est déjà une ApiError parsée, la relancer
+        if (error.message && error.code) {
           throw error;
         }
 
-        throw {
-          message: 'Erreur inattendue',
-          details: error instanceof Error ? error.message : String(error),
-        } as ApiError;
+        // Parser les autres types d'erreurs
+        const apiError = parseApiError(error);
+        console.error(`[API] ERREUR ${url} (${duration}ms):`, apiError);
+
+        // Retry pour certaines erreurs
+        if (retriesLeft > 0 && this.shouldRetry(apiError)) {
+          console.log(`[API] Nouvelle tentative dans 1s... (${retriesLeft} restantes)`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return attempt(retriesLeft - 1);
+        }
+
+        throw apiError;
       }
     };
 
     return attempt(retries);
+  }
+
+  private shouldRetry(error: any): boolean {
+    // Retry sur erreurs réseau, timeout, et certaines erreurs serveur
+    const retryableCodes = ['NETWORK_ERROR', 'TIMEOUT_ERROR', 'HTTP_500', 'HTTP_502', 'HTTP_503'];
+    return retryableCodes.includes(error.code);
   }
 
   async get<T>(url: string, signal?: AbortSignal): Promise<T> {

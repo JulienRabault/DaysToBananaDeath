@@ -6,7 +6,7 @@ export interface ImageResizeOptions {
   maxWidth?: number;
   maxHeight?: number;
   quality?: number; // 0.1 à 1.0 pour JPEG
-  format?: 'jpeg' | 'png' | 'webp';
+  format?: 'jpeg' | 'png' | 'webp' | 'avif';
 }
 
 const DEFAULT_OPTIONS: Required<ImageResizeOptions> = {

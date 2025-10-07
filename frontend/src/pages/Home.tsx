@@ -9,6 +9,7 @@ import { ErrorAlert } from '../components/ErrorAlert';
 import { Spinner } from '../components/Spinner';
 import { useSettings } from '../store/useSettings';
 import { useTranslation } from '../utils/i18n';
+import { formatErrorMessage, parseApiError } from '../utils/errorUtils';
 
 export const Home = () => {
   const { language } = useSettings();
@@ -81,8 +82,12 @@ export const Home = () => {
     try {
       const result = await predictImage(selectedFile);
       setPrediction(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errorPrediction);
+    } catch (err: any) {
+      // Utiliser le nouveau parser d'erreurs pour un message plus précis
+      const apiError = parseApiError(err);
+      const errorMessage = formatErrorMessage(apiError);
+      setError(errorMessage);
+      console.error('Erreur de prédiction:', apiError);
     } finally {
       setIsLoading(false);
     }
