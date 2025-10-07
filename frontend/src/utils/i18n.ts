@@ -38,6 +38,8 @@ export interface Translations {
   predictionNewImage: string;
   predictionCancel: string;
   predictionOr: string;
+  predictionImageAlt: string;
+  predictionError: string;
 
   // Caméra - nouvelles traductions
   cameraStartButton: string;
@@ -116,13 +118,13 @@ export interface Translations {
 export const translations: Record<Language, Translations> = {
   fr: {
     // Navigation et layout
-    appTitle: "Banana Prediction",
+    appTitle: "Durée de vie des bananes",
     appSubtitle: "Prédiction et correction d'images",
 
     // Page principale
-    welcomeTitle: "Banana Prediction",
+    welcomeTitle: "Durée de vie des bananes",
     welcomeSubtitle: "Analysez vos images de bananes et obtenez des prédictions de maturité",
-    mainTitle: "Prédiction de Maturité des Bananes", // Titre principal
+    mainTitle: "Prédiction de maturité des bananes", // Titre principal
 
     // États du backend
     backendStatusTitle: "État du backend",
@@ -146,12 +148,14 @@ export const translations: Record<Language, Translations> = {
 
     // Prédiction
     predictionTitle: "Faire une prédiction",
-    predictionSubtitle: "Uploadez une image ou prenez une photo pour obtenir une prédiction",
+    predictionSubtitle: "Uploadez une image pour obtenir une prédiction",
     predictionAnalyzing: "Analyse en cours...",
     predictionPredict: "Prédire",
     predictionNewImage: "Nouvelle image",
     predictionCancel: "Annuler",
     predictionOr: "ou",
+    predictionImageAlt: "Image de la banane pour la prédiction",
+    predictionError: "Erreur lors de la prédiction",
 
     // Caméra - nouvelles traductions
     cameraStartButton: "Démarrer la caméra",
@@ -232,13 +236,13 @@ export const translations: Record<Language, Translations> = {
 
   en: {
     // Navigation et layout
-    appTitle: "Banana Prediction",
+    appTitle: "Days to banana death",
     appSubtitle: "Image prediction and correction",
 
     // Page principale
-    welcomeTitle: "Banana Prediction",
+    welcomeTitle: "Days to banana death",
     welcomeSubtitle: "Analyze your banana images and get ripeness predictions",
-    mainTitle: "Banana Ripeness Prediction", // Main title
+    mainTitle: "Banana ripeness prediction", // Main title
 
     // États du backend
     backendStatusTitle: "Backend Status",
@@ -262,12 +266,14 @@ export const translations: Record<Language, Translations> = {
 
     // Prédiction
     predictionTitle: "Make a prediction",
-    predictionSubtitle: "Upload an image or take a photo to get a prediction",
+    predictionSubtitle: "Upload an image to get a prediction",
     predictionAnalyzing: "Analyzing...",
     predictionPredict: "Predict",
     predictionNewImage: "New image",
     predictionCancel: "Cancel",
     predictionOr: "or",
+    predictionImageAlt: "Image of the banana for prediction",
+    predictionError: "Error during prediction",
 
     // Caméra - nouvelles traductions
     cameraStartButton: "Start camera",

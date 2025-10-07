@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { health, predictImage, getModelInfo, type ModelInfo } from '../api/endpoints';
 import { PredictResponse } from '../types';
 import { FileDropzone } from '../components/FileDropzone';
-import { CameraCapture } from '../components/CameraCapture';
 import { PredictionResult } from '../components/PredictionResult';
 import { CorrectionForm } from '../components/CorrectionForm';
 import { ErrorAlert } from '../components/ErrorAlert';
@@ -273,20 +272,7 @@ export const Home = () => {
             )}
 
             {!imagePreview ? (
-              <div className="space-y-6">
-                <FileDropzone onFileSelect={handleFileSelect} disabled={isLoading} />
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-                  </div>
-                  <div className="relative flex justify-center">
-                    <span className="bg-white/80 backdrop-blur-sm px-4 py-2 text-sm text-gray-500 dark:bg-gray-800/80 dark:text-gray-400 rounded-full">
-                      {t.predictionOr}
-                    </span>
-                  </div>
-                </div>
-                <CameraCapture onCapture={handleFileSelect} disabled={isLoading} />
-              </div>
+              <FileDropzone onFileSelect={handleFileSelect} disabled={isLoading} />
             ) : (
               <div className="space-y-6">
                 <div className="relative overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-700">
@@ -304,7 +290,7 @@ export const Home = () => {
                       onClick={handleReset}
                       className="w-full max-w-md rounded-xl border-2 border-gray-300 px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all"
                     >
-                      Nouvelle image
+                      {t.predictionNewImage}
                     </button>
                   </div>
                 )}
