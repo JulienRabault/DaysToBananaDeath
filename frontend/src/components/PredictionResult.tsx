@@ -5,18 +5,11 @@ import { useTranslation, translateClass } from '../utils/i18n';
 
 interface PredictionResultProps {
   prediction: PredictResponse;
-  onNewImage?: () => void;
 }
 
-export const PredictionResult = ({ prediction, onNewImage }: PredictionResultProps) => {
+export const PredictionResult = ({ prediction }: PredictionResultProps) => {
   const { language } = useSettings();
   const t = useTranslation(language);
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-    if (confidence >= 0.5) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-  };
 
   const getClassColor = (className: string) => {
     switch (className.toLowerCase()) {

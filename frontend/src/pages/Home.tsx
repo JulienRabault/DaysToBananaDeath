@@ -16,7 +16,6 @@ export const Home = () => {
 
   // État pour le backend
   const [status, setStatus] = useState<'loading' | 'online' | 'offline'>('loading');
-  const [backendError, setBackendError] = useState<string | null>(null);
 
   // État pour la prédiction
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -39,7 +38,7 @@ export const Home = () => {
         setStatus('online');
       } catch (err) {
         setStatus('offline');
-        setBackendError(err instanceof Error ? err.message : t.errorBackendUnavailable);
+        setError(err instanceof Error ? err.message : t.errorBackendUnavailable);
       }
     };
 

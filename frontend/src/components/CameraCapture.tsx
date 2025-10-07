@@ -15,21 +15,20 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const checkCameraPermission = async () => {
     try {
       const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
-      setHasPermission(result.state === 'granted');
+      // setHasPermission(result.state === 'granted');
 
       result.addEventListener('change', () => {
-        setHasPermission(result.state === 'granted');
+        // setHasPermission(result.state === 'granted');
       });
     } catch (err) {
       console.log('Permission API not supported:', err);
-      setHasPermission(null);
+      // setHasPermission(null);
     }
   };
 
@@ -53,7 +52,7 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
-      setHasPermission(true);
+      // setHasPermission(true);
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -73,7 +72,7 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
       }
 
       setError(errorMessage);
-      setHasPermission(false);
+      // setHasPermission(false);
     }
   };
 

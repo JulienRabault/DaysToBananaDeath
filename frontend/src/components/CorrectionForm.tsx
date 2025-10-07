@@ -8,11 +8,11 @@ import { useTranslation, translateClass } from '../utils/i18n';
 
 interface CorrectionFormProps {
   prediction: PredictResponse;
-  onSuccess: () => void;
-  onReset: () => void;
+  // onSuccess: () => void;
+  // onReset: () => void;
 }
 
-export const CorrectionForm = ({ prediction, onSuccess, onReset }: CorrectionFormProps) => {
+export const CorrectionForm = ({ prediction }: CorrectionFormProps) => {
   const { language } = useSettings();
   const t = useTranslation(language);
 
@@ -22,7 +22,7 @@ export const CorrectionForm = ({ prediction, onSuccess, onReset }: CorrectionFor
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [correctionSubmitted, setCorrectionSubmitted] = useState(false); // Nouveau state
+  // const [correctionSubmitted, setCorrectionSubmitted] = useState(false); // Variable non utilisée
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +49,6 @@ export const CorrectionForm = ({ prediction, onSuccess, onReset }: CorrectionFor
 
       await submitCorrection(payload);
       setSuccess(true);
-      setCorrectionSubmitted(true);
       // Ne plus appeler onSuccess() - on garde tout affiché
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l\'envoi de la correction');
