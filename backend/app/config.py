@@ -63,22 +63,6 @@ def _get_env_float_with_warning(key: str, default: str, warn_on_default: bool = 
 class Config(BaseSettings):
     """Configuration class that loads all environment variables."""
 
-    EXPECTED_ENV_VARS: Set[str] = {
-        "MODEL_IMG_SIZE", "MODEL_TYPE", "MODEL_FORMAT", "INFERENCE_DEVICE",
-        "MODEL_LOCAL_PATH", "MODEL_S3_KEY", "WANDB_RUN_PATH", "WANDB_ARTIFACT",
-        "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "S3_BUCKET_NAME",
-        "MODEL_TMP_DIR_PARENT",
-        "DAYS_EXPECTED_UNRIPE", "DAYS_EXPECTED_RIPE", "DAYS_EXPECTED_OVERRIPE",
-        "DAYS_EXPECTED_ROTTEN", "DAYS_EXPECTED_UNKNOWNS",
-        "DAYS_UNRIPE_MIN", "DAYS_RIPE_MIN", "DAYS_RIPE_MAX", "DAYS_OVERRIPE_MAX",
-        "LOG_LEVEL", "ENABLE_MOCK_PREDICTIONS", "ENABLE_CORRECTIONS", "FRONTEND_ORIGIN",
-        "DATASET_PREFIX", "CORRECTIONS_PREFIX", "CORRECTION_COUNTER_KEY", "CORRECTION_THRESHOLD",
-        "UPLOADS_PREFIX", "UPLOAD_PREFIX", "ALERT_WEBHOOK_URL", "S3_ENDPOINT_URL",
-        "RECAPTCHA_SECRET_KEY", "RECAPTCHA_MIN_SCORE", "REDIS_URL",
-        "RATE_LIMIT_PREDICT", "RATE_LIMIT_CORRECTION", "RATE_LIMIT_UPLOAD",
-        "PREDICT_LIMIT", "CORRECTION_LIMIT", "UPLOAD_LIMIT"
-    }
-
     MODEL_IMG_SIZE: int = _get_env_int_with_warning("MODEL_IMG_SIZE", "224")
     MODEL_TYPE: str = _get_env_with_warning("MODEL_TYPE", "resnet50")
     MODEL_FORMAT: str = _get_env_with_warning("MODEL_FORMAT", "ckpt")
@@ -172,11 +156,27 @@ class Config(BaseSettings):
     @classmethod
     def check_unexpected_env_vars(cls) -> None:
         """Check for unexpected environment variables that start with common prefixes."""
+        expected_env_vars = {
+            "MODEL_IMG_SIZE", "MODEL_TYPE", "MODEL_FORMAT", "INFERENCE_DEVICE",
+            "MODEL_LOCAL_PATH", "MODEL_S3_KEY", "WANDB_RUN_PATH", "WANDB_ARTIFACT",
+            "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "S3_BUCKET_NAME",
+            "MODEL_TMP_DIR_PARENT",
+            "DAYS_EXPECTED_UNRIPE", "DAYS_EXPECTED_RIPE", "DAYS_EXPECTED_OVERRIPE",
+            "DAYS_EXPECTED_ROTTEN", "DAYS_EXPECTED_UNKNOWNS",
+            "DAYS_UNRIPE_MIN", "DAYS_RIPE_MIN", "DAYS_RIPE_MAX", "DAYS_OVERRIPE_MAX",
+            "LOG_LEVEL", "ENABLE_MOCK_PREDICTIONS", "ENABLE_CORRECTIONS", "FRONTEND_ORIGIN",
+            "DATASET_PREFIX", "CORRECTIONS_PREFIX", "CORRECTION_COUNTER_KEY", "CORRECTION_THRESHOLD",
+            "UPLOADS_PREFIX", "UPLOAD_PREFIX", "ALERT_WEBHOOK_URL", "S3_ENDPOINT_URL",
+            "RECAPTCHA_SECRET_KEY", "RECAPTCHA_MIN_SCORE", "REDIS_URL",
+            "RATE_LIMIT_PREDICT", "RATE_LIMIT_CORRECTION", "RATE_LIMIT_UPLOAD",
+            "PREDICT_LIMIT", "CORRECTION_LIMIT", "UPLOAD_LIMIT"
+        }
+
         prefixes = ["MODEL_", "AWS_", "S3_", "DAYS_", "LOG_", "ENABLE_", "FRONTEND_", "WANDB_"]
 
         for key in os.environ:
             if any(key.startswith(prefix) for prefix in prefixes):
-                if key not in cls.EXPECTED_ENV_VARS:
+                if key not in expected_env_vars:
                     warnings.warn(
                         f"[CONFIG WARNING] Unexpected environment variable detected: '{key}' "
                         f"(not in expected configuration keys)",
