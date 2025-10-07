@@ -10,7 +10,11 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white;
+    @apply bg-banana-50 text-gray-900 dark:bg-gray-950 dark:text-white;
+    background-image: radial-gradient(circle at 20% 20%, rgba(255, 243, 196, 0.6), transparent 55%),
+      radial-gradient(circle at 80% 10%, rgba(250, 219, 95, 0.5), transparent 55%),
+      radial-gradient(circle at 50% 80%, rgba(240, 180, 41, 0.35), transparent 60%);
+    background-attachment: fixed;
   }
 
   #root {

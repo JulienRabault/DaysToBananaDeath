@@ -49,3 +49,5 @@ logs/
 *.pkl
 
 wandb/
+node_modules/
+frontend/node_modules/
