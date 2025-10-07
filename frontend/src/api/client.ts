@@ -1,4 +1,3 @@
-import { ApiError } from '../types';
 import { API_CONFIG, API_BASE_URL } from '../config/api';
 import { parseApiError } from '../utils/errorUtils';
 

@@ -206,14 +206,22 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
         <div className="flex gap-3">
           <button
             onClick={capturePhoto}
-            disabled={disabled}
+            disabled={disabled || isProcessing}
             className="flex-1 rounded-lg bg-primary-600 px-4 py-2 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
           >
-            {t.cameraCaptureButton}
+            {isProcessing ? (
+              <>
+                <div className="inline-block w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                Traitement...
+              </>
+            ) : (
+              t.cameraCaptureButton
+            )}
           </button>
           <button
             onClick={stopCamera}
-            className="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:border-gray-600 dark:hover:bg-gray-800"
+            disabled={isProcessing}
+            className="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50"
           >
             {t.predictionCancel}
           </button>
