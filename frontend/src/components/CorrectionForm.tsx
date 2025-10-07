@@ -57,14 +57,6 @@ export const CorrectionForm = ({ prediction }: CorrectionFormProps) => {
     }
   };
 
-  const getPredictedClass = () => {
-    if (daysLeft >= 5) return 'unripe';
-    if (daysLeft >= 2 && daysLeft <= 4) return 'ripe';
-    if (daysLeft === 1) return 'overripe';
-    if (daysLeft === 0) return 'rotten';
-    return 'unknowns';
-  };
-
   const getClassEmoji = (className: string) => {
     switch (className.toLowerCase()) {
       case 'unripe': return '🟢';
@@ -98,11 +90,11 @@ export const CorrectionForm = ({ prediction }: CorrectionFormProps) => {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {success ? '✅ Correction envoyée' : t.correctionTitle}
+                {success ? t.correctionSuccessTitle : t.correctionTitle}
               </h3>
               {success && (
                 <p className="text-sm text-green-600 dark:text-green-300">
-                  Faites une nouvelle prédiction pour corriger à nouveau
+                  {t.correctionNewPredictionMessage}
                 </p>
               )}
             </div>
@@ -130,114 +122,206 @@ export const CorrectionForm = ({ prediction }: CorrectionFormProps) => {
             </div>
           )}
 
-          {/* Message de succès affiché dans le formulaire */}
+          {/* Message de succès moderne */}
           {success && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-700">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm font-medium text-green-800 dark:text-green-200">
-                  Correction envoyée avec succès ! Pour soumettre une nouvelle correction, effectuez d'abord une nouvelle prédiction.
-                </span>
+            <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200/50 rounded-xl shadow-sm dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-700/50">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center dark:bg-green-900/40">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-green-800 dark:text-green-200">
+                    {t.correctionSuccessTitle}
+                  </h4>
+                  <p className="text-xs text-green-600 dark:text-green-300 mt-1">
+                    {t.correctionSuccessMessage}
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Question banane ou pas */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
-                Est-ce bien une banane ?
-              </label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
+            {/* Question banane ou pas - Design simplifié */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                {t.correctionBananaQuestion}
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <label className={`
+                  relative flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all
+                  ${isBanana 
+                    ? 'border-green-500 bg-green-50 dark:border-green-400 dark:bg-green-900/20' 
+                    : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
+                  }
+                  ${success ? 'opacity-50 cursor-not-allowed' : ''}
+                `}>
                   <input
                     type="radio"
                     checked={isBanana}
                     onChange={() => setIsBanana(true)}
                     disabled={success}
-                    className="text-orange-600 focus:ring-orange-500 disabled:opacity-50"
+                    className="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
                   />
-                  <span className={`text-sm text-gray-700 dark:text-gray-300 ${success ? 'opacity-50' : ''}`}>
-                    🍌 {t.yes}
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {t.correctionYesBanana}
                   </span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+
+                <label className={`
+                  relative flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all
+                  ${!isBanana 
+                    ? 'border-red-500 bg-red-50 dark:border-red-400 dark:bg-red-900/20' 
+                    : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
+                  }
+                  ${success ? 'opacity-50 cursor-not-allowed' : ''}
+                `}>
                   <input
                     type="radio"
                     checked={!isBanana}
                     onChange={() => setIsBanana(false)}
                     disabled={success}
-                    className="text-orange-600 focus:ring-orange-500 disabled:opacity-50"
+                    className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
                   />
-                  <span className={`text-sm text-gray-700 dark:text-gray-300 ${success ? 'opacity-50' : ''}`}>
-                    ❌ {t.no}
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {t.correctionNoBanana}
                   </span>
                 </label>
               </div>
             </div>
 
-            {/* Slider pour les jours si c'est une banane */}
+            {/* Slider moderne pour les jours si c'est une banane */}
             {isBanana && (
-              <div>
-                <label className={`text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block ${success ? 'opacity-50' : ''}`}>
-                  Jours restants avant que la banane soit trop mûre :
-                </label>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="range"
-                      min="0"
-                      max="7"
-                      value={daysLeft}
-                      onChange={(e) => setDaysLeft(parseInt(e.target.value))}
-                      disabled={success}
-                      className={`flex-1 h-2 bg-gradient-to-r from-red-200 via-yellow-200 to-green-200 rounded-lg appearance-none cursor-pointer dark:from-red-900 dark:via-yellow-900 dark:to-green-900 ${success ? 'opacity-50' : ''}`}
-                    />
-                    <span className={`text-lg font-semibold text-gray-900 dark:text-white min-w-[3rem] text-center ${success ? 'opacity-50' : ''}`}>
-                      {daysLeft}
-                    </span>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    {t.correctionDurationTitle}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {t.correctionDurationSubtitle}
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-800/30 rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50">
+                  <div className="flex items-center gap-6">
+                    <div className="flex-1">
+                      <input
+                        type="range"
+                        min="0"
+                        max="7"
+                        value={daysLeft}
+                        onChange={(e) => setDaysLeft(parseInt(e.target.value))}
+                        disabled={success}
+                        className={`w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 slider ${success ? 'opacity-50' : ''}`}
+                        style={{
+                          background: `linear-gradient(to right, 
+                            #ef4444 0%, 
+                            #f59e0b 30%, 
+                            #10b981 60%, 
+                            #059669 100%)`
+                        }}
+                      />
+                    </div>
+                    <div className={`text-center min-w-[80px] ${success ? 'opacity-50' : ''}`}>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {daysLeft}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        {daysLeft > 1 ? t.correctionDays : t.correctionDay}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Aperçu de la classification */}
-                  <div className={`flex items-center gap-3 p-3 bg-gray-50 rounded-lg dark:bg-gray-700/50 ${success ? 'opacity-50' : ''}`}>
-                    <span className="text-lg">{getClassEmoji(getPredictedClass())}</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      Cela correspond à : <strong>{translateClass(getPredictedClass(), language)}</strong>
-                    </span>
+                  {/* Échelle avec indicateurs discrets */}
+                  <div className="mt-4 flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                      <span className="text-gray-600 dark:text-gray-400 font-medium">{t.correctionStateImmediate}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                      <span className="text-gray-600 dark:text-gray-400 font-medium">{t.correctionStateOptimal}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                      <span className="text-gray-600 dark:text-gray-400 font-medium">{t.correctionStateConservation}</span>
+                    </div>
+                  </div>
+
+                  {/* Indication contextuelle basée sur la valeur */}
+                  <div className="mt-4 p-3 rounded-lg bg-white dark:bg-gray-900/50 border border-gray-200/50 dark:border-gray-700/50">
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-900 dark:text-white">{t.correctionStatePredicted}: </span>
+                      <span className={`
+                        ${daysLeft === 0 ? 'text-red-600 dark:text-red-400' :
+                          daysLeft <= 2 ? 'text-orange-600 dark:text-orange-400' :
+                          daysLeft <= 4 ? 'text-yellow-600 dark:text-yellow-400' :
+                          'text-green-600 dark:text-green-400'}
+                      `}>
+                        {daysLeft === 0 ? t.stateVeryRipe :
+                         daysLeft === 1 ? t.stateRipe :
+                         daysLeft <= 2 ? t.stateGoodRipeness :
+                         daysLeft <= 4 ? t.stateMediumRipeness :
+                         t.stateStillGreen}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Bouton de soumission uniquement */}
+            {/* Bouton de soumission moderne */}
             {!success && (
               <div className="pt-4">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-6 py-3 font-semibold text-white shadow-lg hover:from-orange-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 transition-all"
+                  className="flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-6 py-4 font-semibold text-white shadow-lg hover:from-orange-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
                   {isSubmitting ? (
                     <>
                       <Spinner size="sm" />
-                      Envoi...
+                      <span>{t.correctionSending}</span>
                     </>
                   ) : (
                     <>
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.293l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
                       </svg>
-                      {t.correctionSubmit}
+                      <span>{t.correctionSendButton}</span>
                     </>
                   )}
                 </button>
               </div>
             )}
+
+            {/* Informations sur la prédiction actuelle */}
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200/50 dark:border-gray-700/50">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                {t.correctionCurrentPrediction}
+              </h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">{t.resultTitle}:</span>
+                  <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2 mt-1">
+                    {getClassEmoji(prediction.predicted_label)}
+                    {translateClass(prediction.predicted_label, language)}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">{t.resultConfidence}:</span>
+                  <div className="font-medium text-gray-900 dark:text-white mt-1">
+                    {(prediction.confidence * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            </div>
           </form>
         </div>
       )}
     </div>
   );
-}
+};

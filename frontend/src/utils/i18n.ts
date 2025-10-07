@@ -50,12 +50,33 @@ export interface Translations {
   cameraNotSupported: string;
   cameraInUse: string;
 
-  // Correction
   correctionTitle: string;
   correctionSubmit: string;
   correctionReset: string;
+  correctionBananaQuestion: string;
+  correctionYesBanana: string;
+  correctionNoBanana: string;
+  correctionDurationTitle: string;
+  correctionDurationSubtitle: string;
+  correctionDays: string;
+  correctionDay: string;
+  correctionStateImmediate: string;
+  correctionStateOptimal: string;
+  correctionStateConservation: string;
+  correctionStatePredicted: string;
+  correctionSendButton: string;
+  correctionSending: string;
+  correctionSuccessTitle: string;
+  correctionSuccessMessage: string;
+  correctionNewPredictionMessage: string;
+  correctionCurrentPrediction: string;
 
-  // Résultats
+  stateVeryRipe: string;
+  stateRipe: string;
+  stateGoodRipeness: string;
+  stateMediumRipeness: string;
+  stateStillGreen: string;
+
   resultTitle: string;
   resultConfidence: string;
   resultTopPredictions: string;
@@ -143,10 +164,34 @@ export const translations: Record<Language, Translations> = {
     cameraNotSupported: "Caméra non supportée",
     cameraInUse: "Caméra déjà utilisée",
 
-    // Correction
+    // Correction - nouvelles traductions
     correctionTitle: "Soumettre une correction",
     correctionSubmit: "Soumettre",
     correctionReset: "Recommencer",
+    correctionBananaQuestion: "La prédiction de la banane est-elle correcte ?",
+    correctionYesBanana: "Oui, c'est une banane",
+    correctionNoBanana: "Non, ce n'est pas une banane",
+    correctionDurationTitle: "Durée de conservation",
+    correctionDurationSubtitle: "Combien de temps la banane a-t-elle été conservée ?",
+    correctionDays: "jours",
+    correctionDay: "jour",
+    correctionStateImmediate: "État immédiat",
+    correctionStateOptimal: "État optimal",
+    correctionStateConservation: "État de conservation",
+    correctionStatePredicted: "État prédit",
+    correctionSendButton: "Envoyer la correction",
+    correctionSending: "Envoi de la correction...",
+    correctionSuccessTitle: "Correction soumise",
+    correctionSuccessMessage: "Merci pour votre contribution !",
+    correctionNewPredictionMessage: "Une nouvelle prédiction sera effectuée.",
+    correctionCurrentPrediction: "Prédiction actuelle : {}",
+
+    // États de maturité détaillés
+    stateVeryRipe: "Très mûre",
+    stateRipe: "Mûre",
+    stateGoodRipeness: "Bonne maturité",
+    stateMediumRipeness: "Maturité moyenne",
+    stateStillGreen: "Encore verte",
 
     // Résultats
     resultTitle: "Résultat de la prédiction",
@@ -235,10 +280,34 @@ export const translations: Record<Language, Translations> = {
     cameraNotSupported: "Camera not supported",
     cameraInUse: "Camera in use",
 
-    // Correction
+    // Correction - nouvelles traductions
     correctionTitle: "Submit a correction",
     correctionSubmit: "Submit",
     correctionReset: "Start over",
+    correctionBananaQuestion: "Is the banana prediction correct?",
+    correctionYesBanana: "Yes, it's a banana",
+    correctionNoBanana: "No, it's not a banana",
+    correctionDurationTitle: "Storage duration",
+    correctionDurationSubtitle: "How long has the banana been stored?",
+    correctionDays: "days",
+    correctionDay: "day",
+    correctionStateImmediate: "Immediate state",
+    correctionStateOptimal: "Optimal state",
+    correctionStateConservation: "Conservation state",
+    correctionStatePredicted: "Predicted state",
+    correctionSendButton: "Send correction",
+    correctionSending: "Sending correction...",
+    correctionSuccessTitle: "Correction submitted",
+    correctionSuccessMessage: "Thank you for your contribution!",
+    correctionNewPredictionMessage: "A new prediction will be made.",
+    correctionCurrentPrediction: "Current prediction: {}",
+
+    // États de maturité détaillés
+    stateVeryRipe: "Very ripe",
+    stateRipe: "Ripe",
+    stateGoodRipeness: "Good ripeness",
+    stateMediumRipeness: "Medium ripeness",
+    stateStillGreen: "Still green",
 
     // Résultats
     resultTitle: "Prediction Result",

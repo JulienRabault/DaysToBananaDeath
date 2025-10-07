@@ -44,7 +44,7 @@ export const useSettings = create<Settings>()(
       },
       responseMapping: DEFAULT_RESPONSE_MAPPING,
       theme: 'system',
-      language: 'fr',
+      language: 'en', // Changé de 'fr' à 'en' pour l'anglais par défaut
       setBaseUrl: (url) => set({ baseUrl: url.trim() }),
       setEndpoint: (key, value) =>
         set((state) => ({
@@ -66,7 +66,7 @@ export const useSettings = create<Settings>()(
           },
           responseMapping: DEFAULT_RESPONSE_MAPPING,
           theme: 'system',
-          language: 'fr',
+          language: 'en', // Changé de 'fr' à 'en' pour l'anglais par défaut
         }),
     }),
     {
