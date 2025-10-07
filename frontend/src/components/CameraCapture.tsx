@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ErrorAlert } from './ErrorAlert';
 import { useSettings } from '../store/useSettings';
 import { useTranslation } from '../utils/i18n';
+import { resizeImageFile, checkImageDimensions } from '../utils/imageUtils';
 
 interface CameraCaptureProps {
   onCapture: (file: File) => void;
@@ -15,6 +16,7 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -83,27 +85,60 @@ export const CameraCapture = ({ onCapture, disabled }: CameraCaptureProps) => {
     }
   };
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    try {
+      setIsProcessing(true);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-    ctx.drawImage(video, 0, 0);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        onCapture(file);
-        setIsCapturing(true);
-        stopCamera();
-      }
-    }, 'image/jpeg');
+      ctx.drawImage(video, 0, 0);
+
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          const originalFile = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+          try {
+            // Vérifier les dimensions et redimensionner si nécessaire
+            const { width, height, needsResize } = await checkImageDimensions(originalFile);
+
+            if (needsResize) {
+              console.log(`[CameraCapture] Photo trop grande (${width}x${height}), redimensionnement en cours...`);
+
+              const resizedFile = await resizeImageFile(originalFile, {
+                maxWidth: 4096,
+                maxHeight: 4096,
+                quality: 0.9
+              });
+
+              onCapture(resizedFile);
+            } else {
+              console.log(`[CameraCapture] Photo dans les limites (${width}x${height})`);
+              onCapture(originalFile);
+            }
+          } catch (error) {
+            console.error('[CameraCapture] Erreur lors du traitement de la photo:', error);
+            // En cas d'erreur, utiliser le fichier original
+            onCapture(originalFile);
+          }
+
+          setIsCapturing(true);
+          stopCamera();
+        }
+      }, 'image/jpeg');
+    } catch (error) {
+      console.error('[CameraCapture] Erreur lors de la capture:', error);
+      setError('Erreur lors de la capture de la photo');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const resetCapture = () => {
