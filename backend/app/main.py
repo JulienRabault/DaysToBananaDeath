@@ -14,9 +14,18 @@ from .config import config
 
 app = FastAPI(title="Banana Ripeness API", version="0.1.0")
 
+# Configuration CORS pour supporter plusieurs domaines
+allowed_origins = []
+if config.FRONTEND_ORIGIN == "*":
+    allowed_origins = ["*"]
+else:
+    # Support pour plusieurs domaines séparés par des virgules
+    origins = [origin.strip() for origin in config.FRONTEND_ORIGIN.split(",")]
+    allowed_origins = origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[config.FRONTEND_ORIGIN] if config.FRONTEND_ORIGIN != "*" else ["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

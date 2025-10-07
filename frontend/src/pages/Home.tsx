@@ -217,11 +217,11 @@ export const Home = () => {
                         <dt className="text-gray-600 dark:text-gray-400">{t.modelClasses} :</dt>
                         <dd className="font-medium text-gray-900 dark:text-white text-right">
                           <div className="flex flex-wrap gap-1 justify-end">
-                            {modelInfo.classes.map((cls) => (
+                            {modelInfo?.classes?.map((cls) => (
                               <span key={cls} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                                 {cls}
                               </span>
-                            ))}
+                            )) || <span className="text-gray-500 text-sm">Non disponible</span>}
                           </div>
                         </dd>
                       </div>

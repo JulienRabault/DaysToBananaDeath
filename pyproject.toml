@@ -31,6 +31,8 @@ dependencies = [
     "boto3>=1.40.46",
     "slowapi>=0.1.9",
     "redis>=6.4.0",
+    "pydantic-settings>=2.11.0",
+    "httpx>=0.28.1",
 ]
 [[tool.uv.index]]
 name = "pytorch-cu128"
