@@ -43,10 +43,10 @@ export const Predict = () => {
     }
   };
 
-  const handleCorrectionSuccess = () => {
-    // Ne plus effacer automatiquement - on garde tout affiché
-    // L'utilisateur utilisera le bouton "Nouvelle prédiction" pour reset
-  };
+  // const handleCorrectionSuccess = () => {
+  //   // Ne plus effacer automatiquement - on garde tout affiché
+  //   // L'utilisateur utilisera le bouton "Nouvelle prédiction" pour reset
+  // };
 
   const handleReset = () => {
     setSelectedFile(null);

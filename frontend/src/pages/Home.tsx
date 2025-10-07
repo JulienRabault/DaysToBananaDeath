@@ -88,12 +88,6 @@ export const Home = () => {
     }
   };
 
-  const handleCorrectionSuccess = () => {
-    setSelectedFile(null);
-    setImagePreview(null);
-    setPrediction(null);
-  };
-
   const handleReset = () => {
     setSelectedFile(null);
     setImagePreview(null);
