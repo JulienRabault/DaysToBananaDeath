@@ -24,80 +24,25 @@ CLASS_NAMES = ['overripe', 'ripe', 'rotten', 'unripe', 'unknowns']
 
 def optimize_image_for_training(image_bytes: bytes, original_filename: str = "image") -> tuple[bytes, str]:
     """
-    Convert any image to optimal format for training.
-
-    Args:
-        image_bytes: Raw image data
-        original_filename: Original filename to preserve some info
-
-    Returns:
-        tuple: (optimized_image_bytes, new_filename)
+    Return image as-is without any transformation.
     """
     import logging
     logger = logging.getLogger(__name__)
 
     try:
-        # Open the image with PIL
         img = Image.open(io.BytesIO(image_bytes))
+        logger.info(f"[IMAGE_OPT] Original: {img.format} {img.size} {img.mode}")
 
-        # Original image info
-        original_format = img.format
-        original_size = img.size
-        original_mode = img.mode
-
-        logger.info(f"[IMAGE_OPT] Original: {original_format} {original_size} {original_mode}")
-
-        # Convert to RGB if necessary (to support RGBA, P, etc.)
-        if img.mode in ('RGBA', 'LA', 'P'):
-            # Create a white background for images with transparency
-            background = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'P':
-                img = img.convert('RGBA')
-            background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
-            img = background
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-
-        # Resize if the image is too large (training optimization)
-        max_size = 512  # Recommended max size for training
-        if max(img.size) > max_size:
-            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-            logger.info(f"[IMAGE_OPT] Resized to: {img.size}")
-
-        # Save as optimized JPEG
-        output_buffer = io.BytesIO()
-
-        # Optimal quality for training: 90%
-        # - High enough to preserve important details
-        # - Compressed enough to reduce storage size
-        img.save(
-            output_buffer,
-            format='JPEG',
-            quality=90,
-            optimize=True,
-            progressive=True  # Progressive JPEG for better performance
-        )
-
-        optimized_bytes = output_buffer.getvalue()
-
-        # Generate new filename
+        # Return original bytes without any transformation
         base_name = os.path.splitext(original_filename)[0]
-        new_filename = f"{base_name}_optimized.jpg"
+        new_filename = f"{base_name}.jpg"
 
-        # Compression statistics
-        original_size_bytes = len(image_bytes)
-        optimized_size_bytes = len(optimized_bytes)
-        compression_ratio = (1 - optimized_size_bytes / original_size_bytes) * 100
+        logger.info(f"[IMAGE_OPT] No transformation applied - keeping original image")
 
-        logger.info(f"[IMAGE_OPT] Optimized: JPEG {img.size} RGB")
-        logger.info(f"[IMAGE_OPT] Size: {original_size_bytes} -> {optimized_size_bytes} bytes ({compression_ratio:.1f}% reduction)")
-        logger.info(f"[IMAGE_OPT] Filename: {original_filename} -> {new_filename}")
-
-        return optimized_bytes, new_filename
+        return image_bytes, original_filename
 
     except Exception as e:
-        logger.error(f"[IMAGE_OPT] Failed to optimize image: {str(e)}")
-        # In case of error, return the original image
+        logger.error(f"[IMAGE_OPT] Failed to process image: {str(e)}")
         return image_bytes, original_filename
 
 
@@ -235,9 +180,25 @@ async def submit_correction(request: Request, body: CorrectionRequest) -> Dict[s
 
             logging.info(f"[CORRECTION] Temporary image uploaded directly to: {dest_key}")
 
+        elif body.image_key.startswith("temp_"):
+            # Temporary image without temp_file_data - this is an error
+            logging.error(f"[CORRECTION] Temporary image key {body.image_key} without temp_file_data")
+            raise HTTPException(
+                status_code=400,
+                detail="Les images temporaires nécessitent des données de fichier. Veuillez réessayer l'upload."
+            )
+
         else:
             # This is an existing S3 image, copy it
             logging.info(f"[CORRECTION] Processing existing S3 image: {source_key}")
+
+            # Check if the S3 key actually exists
+            if not s3.object_exists(source_key):
+                logging.error(f"[CORRECTION] S3 object does not exist: {source_key}")
+                raise HTTPException(
+                    status_code=404,
+                    detail="L'image source n'existe pas. Veuillez réessayer l'upload."
+                )
 
             # For existing S3 images, we need to download, optimize and re-upload as JPG
             try:
@@ -267,11 +228,10 @@ async def submit_correction(request: Request, body: CorrectionRequest) -> Dict[s
 
             except Exception as e:
                 logging.error(f"[CORRECTION] Failed to process existing S3 image: {str(e)}")
-                # Fallback: simple copy with JPG extension
-                ext = ".jpg"
-                dest_key = posixpath.join(dataset_prefix, final_label, f"{cid}{ext}")
-                s3.copy_object(source_key=source_key, dest_key=dest_key)
-                logging.info(f"[CORRECTION] Fallback: S3 image copied from {source_key} to {dest_key}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Erreur lors du traitement de l'image. Veuillez réessayer."
+                )
 
         # Record JSON
         record = {

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { resizeImageFile, checkImageDimensions } from '../utils/imageUtils';
+import { isAvifFile, processImageToJpg } from '../utils/imageUtils';
 
 interface FileDropzoneProps {
   onFileSelect: (file: File) => void;
@@ -8,40 +8,27 @@ interface FileDropzoneProps {
 }
 
 export const FileDropzone = ({ onFileSelect, disabled }: FileDropzoneProps) => {
-  const [isResizing, setIsResizing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
         const file = acceptedFiles[0];
 
+        if (isAvifFile(file)) {
+          alert('Les fichiers AVIF ne sont pas acceptés. Veuillez utiliser JPG, PNG ou WebP.');
+          return;
+        }
+
         try {
-          setIsResizing(true);
-
-          // Vérifier les dimensions de l'image
-          const { width, height, needsResize } = await checkImageDimensions(file);
-
-          if (needsResize) {
-            console.log(`[FileDropzone] Image trop grande (${width}x${height}), redimensionnement en cours...`);
-
-            // Redimensionner l'image automatiquement
-            const resizedFile = await resizeImageFile(file, {
-              maxWidth: 4096,
-              maxHeight: 4096,
-              quality: 0.9,
-            });
-
-            onFileSelect(resizedFile);
-          } else {
-            console.log(`[FileDropzone] Image dans les limites (${width}x${height})`);
-            onFileSelect(file);
-          }
+          setIsProcessing(true);
+          const processedFile = await processImageToJpg(file);
+          onFileSelect(processedFile);
         } catch (error) {
-          console.error("[FileDropzone] Erreur lors du traitement de l'image:", error);
-          // En cas d'erreur, utiliser le fichier original
-          onFileSelect(file);
+          console.error('Erreur lors du traitement de l\'image:', error);
+          alert('Erreur lors du traitement de l\'image');
         } finally {
-          setIsResizing(false);
+          setIsProcessing(false);
         }
       }
     },
@@ -51,10 +38,10 @@ export const FileDropzone = ({ onFileSelect, disabled }: FileDropzoneProps) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.avif'], // Ajout du support .avif
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
     },
     multiple: false,
-    disabled: disabled || isResizing,
+    disabled: disabled || isProcessing,
   });
 
   return (
@@ -68,7 +55,7 @@ export const FileDropzone = ({ onFileSelect, disabled }: FileDropzoneProps) => {
             ? 'border-primary-500 bg-primary-50 dark:bg-primary-950'
             : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
         }
-        ${disabled || isResizing ? 'cursor-not-allowed opacity-50' : ''}
+        ${disabled || isProcessing ? 'cursor-not-allowed opacity-50' : ''}
         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
       `}
       role="button"
@@ -77,39 +64,44 @@ export const FileDropzone = ({ onFileSelect, disabled }: FileDropzoneProps) => {
     >
       <input {...getInputProps()} aria-label="Sélectionner un fichier image" />
 
-      {isResizing ? (
+      {isProcessing ? (
         <>
-          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-gray-300 border-t-primary-600"></div>
-          <p className="text-sm text-primary-600 dark:text-primary-400">Redimensionnement de l&apos;image...</p>
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600"></div>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Traitement de l'image...
+          </p>
         </>
       ) : (
         <>
-          <svg
-            className="mb-4 h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-            />
-          </svg>
-          {isDragActive ? (
-            <p className="text-sm text-primary-600 dark:text-primary-400">Déposez l&apos;image ici...</p>
-          ) : (
-            <>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Glissez-déposez une image ici, ou cliquez pour sélectionner
-              </p>
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
-                PNG, JPG, JPEG, WEBP, AVIF (redimensionnement automatique si nécessaire)
-              </p>
-            </>
-          )}
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900">
+            <svg
+              className="h-6 w-6 text-primary-600 dark:text-primary-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
+              {isDragActive ? "Déposez l'image ici" : "Glissez-déposez votre image"}
+            </p>
+
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              ou <span className="font-medium text-primary-600 dark:text-primary-400">cliquez pour parcourir</span>
+            </p>
+
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              JPG, PNG, WebP uniquement (pas d'AVIF)
+            </p>
+          </div>
         </>
       )}
     </div>

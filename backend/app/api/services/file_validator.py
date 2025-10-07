@@ -2,7 +2,7 @@
 
 import io
 import logging
-from typing import Set, Tuple
+from typing import Set
 
 from fastapi import HTTPException, UploadFile
 from PIL import Image
@@ -148,3 +148,27 @@ def log_upload_attempt(file: UploadFile, client_ip: str = "unknown") -> None:
         f"content_type={file.content_type}, "
         f"client_ip={client_ip}"
     )
+
+
+def is_avif_file(content_type: str, filename: str) -> bool:
+    return content_type == 'image/avif' or filename.lower().endswith('.avif')
+
+
+def process_image_to_jpg(image_bytes: bytes) -> bytes:
+    img = Image.open(io.BytesIO(image_bytes))
+
+    if img.mode in ('RGBA', 'LA', 'P'):
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+        img = background
+    elif img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    img = img.resize((512, 512), Image.Resampling.LANCZOS)
+
+    output_buffer = io.BytesIO()
+    img.save(output_buffer, format='JPEG', quality=90)
+
+    return output_buffer.getvalue()

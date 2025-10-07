@@ -33,6 +33,7 @@ dependencies = [
     "redis>=6.4.0",
     "pydantic-settings>=2.11.0",
     "httpx>=0.28.1",
+    "notebook>=7.4.7",
 ]
 [[tool.uv.index]]
 name = "pytorch-cu128"

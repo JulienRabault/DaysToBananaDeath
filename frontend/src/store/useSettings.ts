@@ -71,6 +71,7 @@ export const useSettings = create<Settings>()(
     }),
     {
       name: 'app-settings',
+      version: 2,
     }
   )
 );

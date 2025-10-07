@@ -101,6 +101,16 @@ class S3Service:
         except self.s3.exceptions.NoSuchKey:
             return None
 
+    def object_exists(self, key: str) -> bool:
+        """Check if an object exists in S3."""
+        try:
+            self.s3.head_object(Bucket=self.bucket, Key=key)
+            return True
+        except self.s3.exceptions.NoSuchKey:
+            return False
+        except Exception:
+            return False
+
     def increment_counter(self, key: str) -> int:
         """Atomically increment counter stored in S3."""
         try:
