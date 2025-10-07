@@ -353,8 +353,6 @@ export const Home = () => {
           <PredictionResult prediction={prediction} />
           <CorrectionForm
             prediction={prediction}
-            onSuccess={handleCorrectionSuccess}
-            onReset={handleReset}
           />
         </div>
       )}
