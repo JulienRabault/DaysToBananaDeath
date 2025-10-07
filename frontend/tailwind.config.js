@@ -16,6 +16,18 @@ export default {
           800: '#31425e',
           900: '#2c3950',
         },
+        banana: {
+          50: '#fffbea',
+          100: '#fff3c4',
+          200: '#fce588',
+          300: '#fadb5f',
+          400: '#f7c948',
+          500: '#f0b429',
+          600: '#de911d',
+          700: '#c16a0a',
+          800: '#9c4810',
+          900: '#6b3410',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
